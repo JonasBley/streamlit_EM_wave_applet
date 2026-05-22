@@ -1,0 +1,9 @@
+[project]
+name = "streamlit-em-wave-applet"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "numpy>=2.4.6",
+    "plotly>=6.7.0",
+    "streamlit>=1.57.0",
+]
