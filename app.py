@@ -629,9 +629,9 @@ plot_config = {
 
 st.plotly_chart(fig, use_container_width=True, config=plot_config)
 
-# --- 6. NAVIGATION & SOLUTION BUTTONS (BOTTOM) ---
+# --- 6. NAVIGATION, HINT, & EXPLANATION BOXES (BOTTOM) ---
 
-# 3. Hint Box (Green) - Moved below the applet
+# Hint Box (Green)
 if st.session_state.show_hint and "hint" in step_data:
     processed_hint = process_math(step_data.get("hint", ""))
     st.markdown(
@@ -639,6 +639,20 @@ if st.session_state.show_hint and "hint" in step_data:
         <div style="background-color: #e8f5e9; color: black; padding: 15px; 
                     border-radius: 8px; font-size: 15px; border: 2px solid #4caf50; margin-bottom: 15px;">
             <b>💡 Hint:</b> {processed_hint}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+# New Post-Completion Explanation Box (Light Blue)
+# This box activates automatically once target parameters are met, matching the Next Step button lifecycle
+if target_met and "explanation" in step_data and step_data["explanation"]:
+    processed_explanation = process_math(step_data.get("explanation", ""))
+    st.markdown(
+        f"""
+        <div style="background-color: #e3f2fd; color: black; padding: 20px; 
+                    border-radius: 8px; font-size: 16px; border: 2px solid #2196f3; margin-bottom: 15px;">
+            <div style="line-height: 1.6;">🎓 <b>Correct! </b> {processed_explanation}</div>
         </div>
         """,
         unsafe_allow_html=True
