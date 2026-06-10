@@ -265,34 +265,10 @@ if processed_task:
         unsafe_allow_html=True
     )
 
-# 3. Hint Box (Green)
-if st.session_state.show_hint and "hint" in step_data:
-    processed_hint = process_math(step_data.get("hint", ""))
-    st.markdown(
-        f"""
-        <div style="background-color: #e8f5e9; color: black; padding: 15px; 
-                    border-radius: 8px; font-size: 15px; border: 2px solid #4caf50; margin-bottom: 15px;">
-            <b>💡 Hint:</b> {processed_hint}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
 target_met = check_target_met(step_data.get("target", {}), derived_state)
 
-if not is_last_step:
-    # Set up layout for top inline buttons (Only Hint remains here)
-    col_btn_hint, _spacer = st.columns([1.2, 8.8])
-
-    with col_btn_hint:
-        if "hint" in step_data:
-            btn_text = "💡 Hide Hint" if st.session_state.show_hint else "💡 Show Hint"
-            st.button(btn_text, on_click=toggle_hint, use_container_width=True)
-
-elif st.session_state.current_challenge != "Free Play":
+if is_last_step and st.session_state.current_challenge != "Free Play":
     st.success("Challenge Completed!")
-
-# Removed st.divider() from here
 
 # --- 4. UI: SLIDERS & CONTROLS ---
 col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
@@ -574,9 +550,28 @@ plot_config = {
 st.plotly_chart(fig, use_container_width=True, config=plot_config)
 
 # --- 6. NAVIGATION & SOLUTION BUTTONS (BOTTOM) ---
+
+# 3. Hint Box (Green) - Moved below the applet
+if st.session_state.show_hint and "hint" in step_data:
+    processed_hint = process_math(step_data.get("hint", ""))
+    st.markdown(
+        f"""
+        <div style="background-color: #e8f5e9; color: black; padding: 15px; 
+                    border-radius: 8px; font-size: 15px; border: 2px solid #4caf50; margin-bottom: 15px;">
+            <b>💡 Hint:</b> {processed_hint}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
 if not is_last_step:
     st.markdown("<br>", unsafe_allow_html=True)
-    col_btn_next, _spacer, col_btn_solve = st.columns([1.3, 7.4, 1.3])
+    col_btn_hint, col_btn_next, _spacer, col_btn_solve = st.columns([1.5, 1.5, 5.5, 1.5])
+
+    with col_btn_hint:
+        if "hint" in step_data:
+            btn_text = "💡 Hide Hint" if st.session_state.show_hint else "💡 Show Hint"
+            st.button(btn_text, on_click=toggle_hint, use_container_width=True)
 
     with col_btn_next:
         st.button("👣 Next Step ➔", disabled=not target_met, on_click=next_step, use_container_width=True)
