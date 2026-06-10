@@ -403,10 +403,11 @@ if st.session_state.insert_wp:
         fig.add_trace(go.Scatter3d(x=[z_wp_in, z_wp_in], y=fa_x, z=fa_y, mode='lines',
                                    line=dict(color='orange', width=5, dash='dash'), name='Fast Axis'), row=1,
                       col=spatial_col)
-        # Fast Axis Arrowheads (Orange)
+
+        # WP Fast Axis Arrowhead (Orange) in Main Spatial Plot - Single Direction
         fig.add_trace(go.Cone(
-            x=[z_wp_in, z_wp_in], y=fa_x, z=fa_y,
-            u=[0, 0], v=[-np.cos(wp_angle), np.cos(wp_angle)], w=[-np.sin(wp_angle), np.sin(wp_angle)],
+            x=[z_wp_in], y=[fa_x[1]], z=[fa_y[1]],
+            u=[0], v=[np.cos(wp_angle)], w=[np.sin(wp_angle)],
             colorscale=[[0, 'orange'], [1, 'orange']], showscale=False,
             sizemode="absolute", sizeref=0.3, anchor="tail", hoverinfo='skip', showlegend=False
         ), row=1, col=spatial_col)
@@ -418,12 +419,13 @@ if st.session_state.insert_pol:
         ta_y = [-1.5 * np.sin(pol_angle), 1.5 * np.sin(pol_angle)]
         fig.add_trace(go.Scatter3d(x=[z_pol, z_pol], y=ta_x, z=ta_y, mode='lines', line=dict(color='cyan', width=5),
                                    name='Transmission Axis'), row=1, col=spatial_col)
-        # Transmission Axis Arrowheads (Cyan)
+
+        # Polarizer Transmission Axis Arrowheads (Cyan)
         fig.add_trace(go.Cone(
             x=[z_pol, z_pol], y=ta_x, z=ta_y,
             u=[0, 0], v=[-np.cos(pol_angle), np.cos(pol_angle)], w=[-np.sin(pol_angle), np.sin(pol_angle)],
             colorscale=[[0, 'cyan'], [1, 'cyan']], showscale=False,
-            sizemode="absolute", sizeref=0.3, anchor="tail", hoverinfo='skip', showlegend=False
+            sizemode="absolute", sizeref=0.3, anchor="tip", hoverinfo='skip', showlegend=False
         ), row=1, col=spatial_col)
 
 if st.session_state.show_combined:
@@ -453,14 +455,14 @@ if st.session_state.show_poincare:
                                    line=dict(color='cyan', width=4), hoverinfo='skip', showlegend=False), row=row,
                       col=col)
 
-        # State Vector Arrowhead (Cyan) instead of Magenta Marker
+        # State Vector Arrowhead (Cyan)
         stokes_norm = np.linalg.norm(stokes_vec)
         if stokes_norm > 1e-4:
             fig.add_trace(go.Cone(
                 x=[stokes_vec[0]], y=[stokes_vec[1]], z=[stokes_vec[2]],
                 u=[stokes_vec[0] / stokes_norm], v=[stokes_vec[1] / stokes_norm], w=[stokes_vec[2] / stokes_norm],
                 colorscale=[[0, 'cyan'], [1, 'cyan']], showscale=False,
-                sizemode="absolute", sizeref=0.15, anchor="tail", hoverinfo='skip', showlegend=False
+                sizemode="absolute", sizeref=0.15, anchor="tip", hoverinfo='skip', showlegend=False
             ), row=row, col=col)
 
 
@@ -470,15 +472,15 @@ if st.session_state.show_poincare:
 
         if st.session_state.insert_wp:
             n_x, n_y = np.cos(2 * wp_angle), np.sin(2 * wp_angle)
-            fig.add_trace(go.Scatter3d(x=[-n_x * 1.1, n_x * 1.2], y=[-n_y * 1.1, n_y * 1.2], z=[0, 0], mode='lines',
+            fig.add_trace(go.Scatter3d(x=[-n_x * 1.15, n_x * 1.15], y=[-n_y * 1.15, n_y * 1.15], z=[0, 0], mode='lines',
                                        line=dict(color='orange', width=4, dash='dash'), hoverinfo='skip',
                                        showlegend=False),
                           row=1, col=sphere1_col)
 
-            # WP Operator Axis Arrowheads (Orange)
+            # WP Operator Axis Arrowhead (Orange) - Single Direction pointing outward
             fig.add_trace(go.Cone(
-                x=[-n_x * 1.1, n_x * 1.2], y=[-n_y * 1.1, n_y * 1.2], z=[0, 0],
-                u=[-n_x, n_x], v=[-n_y, n_y], w=[0, 0],
+                x=[n_x * 1.15], y=[n_y * 1.15], z=[0],
+                u=[n_x], v=[n_y], w=[0],
                 colorscale=[[0, 'orange'], [1, 'orange']], showscale=False, sizemode="absolute",
                 sizeref=0.15, anchor="tail", hoverinfo='skip', showlegend=False
             ), row=1, col=sphere1_col)
@@ -500,7 +502,7 @@ if st.session_state.show_poincare:
                 w_dir = radius * (-np.sin(retardance) * e1[2] + np.cos(retardance) * e2[2])
                 fig.add_trace(go.Cone(x=[arc_x[-1]], y=[arc_y[-1]], z=[arc_z[-1]], u=[u_dir], v=[v_dir], w=[w_dir],
                                       colorscale=[[0, 'gold'], [1, 'gold']], showscale=False, sizemode="absolute",
-                                      sizeref=0.1, anchor="tail", hoverinfo='skip', showlegend=False), row=1,
+                                      sizeref=0.1, anchor="tip", hoverinfo='skip', showlegend=False), row=1,
                               col=sphere1_col)
                 fig.add_trace(go.Scatter3d(x=[arc_x[-1]], y=[arc_y[-1]], z=[arc_z[-1]], mode='text',
                                            text=[f"Γ = {st.session_state.retardance_pi:.2f}π"],
