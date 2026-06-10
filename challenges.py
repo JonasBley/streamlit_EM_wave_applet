@@ -12,7 +12,7 @@ CHALLENGES = {
     "Master Tutorial: The Polarization Journey": {
         "steps": [
             {
-                "text": r"<b>Step 1: The Macroscopic Wave</b><br>Light is an electromagnetic wave where the electric field $\vec{E}$ is confined to the transverse $x$-$y$ plane. It is a transverse wave, which means that the electric field oscillates perpendicularly to the direction of propagation. The wave can be described by the Jones vector $\vec{E} = \begin{pmatrix} E_x \\ E_y e^{i\varphi} \end{pmatrix}$. The absolute value of the amplitudes of the Jones vector squared must add up to one: $|E_X|^2+|E_Y|^2=1$.",
+                "text": r"<b>Step 1: The Macroscopic Wave</b><br>Light is an electromagnetic wave where the electric field $\vec{E}$ is confined to the transverse $x$-$y$ plane, oscillating perpendicular to the direction of propagation. The wave can be described by the Jones vector $\vec{E} = \begin{pmatrix} E_x \\ E_y e^{i\varphi} \end{pmatrix}$. The absolute value of the amplitudes of the Jones vector squared must add up to one: $|E_X|^2+|E_Y|^2=1$.",
                 "task": r"Move the slider to $E_x=0.5$ and watch the change in the electric field components and the combined wave in the applet below. Notice how the amplitude in $y$ direction $E_y$ is not the same as $E_x$. Click on the Next Step button to learn why.",
                 "hint": r"Focus on the <b>Incident Wave</b> section. Adjust the first slider until the Amplitude $E_x$ reads exactly <b>0.50</b>.",
                 "setup": {"insert_wp": False, "insert_pol": False, "show_poincare": False, "E_x_amp": 0.0, "phase_relative_pi": 0.0, "show_toggles": False},

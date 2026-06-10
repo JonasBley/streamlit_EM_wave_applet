@@ -281,25 +281,18 @@ if st.session_state.show_hint and "hint" in step_data:
 target_met = check_target_met(step_data.get("target", {}), derived_state)
 
 if not is_last_step:
-    # Set up layout for top inline buttons (without the solve button)
-    col_btn_hint, col_btn_next, _spacer = st.columns([1., 1.8, 7.2])
+    # Set up layout for top inline buttons (Only Hint remains here)
+    col_btn_hint, _spacer = st.columns([1.2, 8.8])
 
     with col_btn_hint:
         if "hint" in step_data:
-            # Keep the emoji on BOTH states so the baseline alignment
-            # and button height don't jump when clicked!
             btn_text = "💡 Hide Hint" if st.session_state.show_hint else "💡 Show Hint"
-
-            # use_container_width forces it to center nicely in the column
             st.button(btn_text, on_click=toggle_hint, use_container_width=True)
-
-    with col_btn_next:
-        st.button("👣 Next Step ➔", disabled=not target_met, on_click=next_step)
 
 elif st.session_state.current_challenge != "Free Play":
     st.success("Challenge Completed!")
 
-st.divider()
+# Removed st.divider() from here
 
 # --- 4. UI: SLIDERS & CONTROLS ---
 col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
@@ -580,9 +573,14 @@ plot_config = {
 
 st.plotly_chart(fig, use_container_width=True, config=plot_config)
 
-# --- 6. SOLUTION BUTTON (BOTTOM LEFT) ---
-if not is_last_step and "solution" in step_data:
+# --- 6. NAVIGATION & SOLUTION BUTTONS (BOTTOM) ---
+if not is_last_step:
     st.markdown("<br>", unsafe_allow_html=True)
-    col_bottom_btn, _ = st.columns([1.3, 8.7])
-    with col_bottom_btn:
-        st.button("✅ Show Solution", on_click=solve_challenge, use_container_width=True)
+    col_btn_next, _spacer, col_btn_solve = st.columns([1.3, 7.4, 1.3])
+
+    with col_btn_next:
+        st.button("👣 Next Step ➔", disabled=not target_met, on_click=next_step, use_container_width=True)
+
+    with col_btn_solve:
+        if "solution" in step_data:
+            st.button("✅ Show Solution", on_click=solve_challenge, use_container_width=True)
