@@ -232,7 +232,6 @@ def process_math(text):
         except Exception:
             return f"${code}$"
 
-    # Extract block math first, then inline math
     text = re.sub(r'\$\$(.*?)\$\$', replace_block, text, flags=re.DOTALL)
     text = re.sub(r'\$(.*?)\$', replace_inline, text, flags=re.DOTALL)
     return text
@@ -404,6 +403,13 @@ if st.session_state.insert_wp:
         fig.add_trace(go.Scatter3d(x=[z_wp_in, z_wp_in], y=fa_x, z=fa_y, mode='lines',
                                    line=dict(color='orange', width=5, dash='dash'), name='Fast Axis'), row=1,
                       col=spatial_col)
+        # Fast Axis Arrowheads (Orange)
+        fig.add_trace(go.Cone(
+            x=[z_wp_in, z_wp_in], y=fa_x, z=fa_y,
+            u=[0, 0], v=[-np.cos(wp_angle), np.cos(wp_angle)], w=[-np.sin(wp_angle), np.sin(wp_angle)],
+            colorscale=[[0, 'orange'], [1, 'orange']], showscale=False,
+            sizemode="absolute", sizeref=0.3, anchor="tail", hoverinfo='skip', showlegend=False
+        ), row=1, col=spatial_col)
 
 if st.session_state.insert_pol:
     draw_optical_element(z_pol, z_pol, 'cyan', 'Polarizer', False)
@@ -412,6 +418,13 @@ if st.session_state.insert_pol:
         ta_y = [-1.5 * np.sin(pol_angle), 1.5 * np.sin(pol_angle)]
         fig.add_trace(go.Scatter3d(x=[z_pol, z_pol], y=ta_x, z=ta_y, mode='lines', line=dict(color='cyan', width=5),
                                    name='Transmission Axis'), row=1, col=spatial_col)
+        # Transmission Axis Arrowheads (Cyan)
+        fig.add_trace(go.Cone(
+            x=[z_pol, z_pol], y=ta_x, z=ta_y,
+            u=[0, 0], v=[-np.cos(pol_angle), np.cos(pol_angle)], w=[-np.sin(pol_angle), np.sin(pol_angle)],
+            colorscale=[[0, 'cyan'], [1, 'cyan']], showscale=False,
+            sizemode="absolute", sizeref=0.3, anchor="tail", hoverinfo='skip', showlegend=False
+        ), row=1, col=spatial_col)
 
 if st.session_state.show_combined:
     z_final = z_pol if st.session_state.insert_pol else z_wp_out
@@ -439,9 +452,16 @@ if st.session_state.show_poincare:
         fig.add_trace(go.Scatter3d(x=[0, stokes_vec[0]], y=[0, stokes_vec[1]], z=[0, stokes_vec[2]], mode='lines',
                                    line=dict(color='cyan', width=4), hoverinfo='skip', showlegend=False), row=row,
                       col=col)
-        fig.add_trace(go.Scatter3d(x=[stokes_vec[0]], y=[stokes_vec[1]], z=[stokes_vec[2]], mode='markers',
-                                   marker=dict(color='magenta', size=8), hoverinfo='skip', showlegend=False), row=row,
-                      col=col)
+
+        # State Vector Arrowhead (Cyan) instead of Magenta Marker
+        stokes_norm = np.linalg.norm(stokes_vec)
+        if stokes_norm > 1e-4:
+            fig.add_trace(go.Cone(
+                x=[stokes_vec[0]], y=[stokes_vec[1]], z=[stokes_vec[2]],
+                u=[stokes_vec[0] / stokes_norm], v=[stokes_vec[1] / stokes_norm], w=[stokes_vec[2] / stokes_norm],
+                colorscale=[[0, 'cyan'], [1, 'cyan']], showscale=False,
+                sizemode="absolute", sizeref=0.15, anchor="tail", hoverinfo='skip', showlegend=False
+            ), row=row, col=col)
 
 
     if has_two_spheres:
@@ -454,6 +474,14 @@ if st.session_state.show_poincare:
                                        line=dict(color='orange', width=4, dash='dash'), hoverinfo='skip',
                                        showlegend=False),
                           row=1, col=sphere1_col)
+
+            # WP Operator Axis Arrowheads (Orange)
+            fig.add_trace(go.Cone(
+                x=[-n_x * 1.1, n_x * 1.2], y=[-n_y * 1.1, n_y * 1.2], z=[0, 0],
+                u=[-n_x, n_x], v=[-n_y, n_y], w=[0, 0],
+                colorscale=[[0, 'orange'], [1, 'orange']], showscale=False, sizemode="absolute",
+                sizeref=0.15, anchor="tail", hoverinfo='skip', showlegend=False
+            ), row=1, col=sphere1_col)
 
             if retardance > 0:
                 center = np.array([n_x, n_y, 0]) * 1.15
