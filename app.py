@@ -287,7 +287,7 @@ with col2:
             st.checkbox("Insert Wave Plate", key="insert_wp")
 
         if st.session_state.insert_wp:
-            st.slider("WP Fast Axis Angle (Degrees)", 0.0, 180.0, step=0.5, key="wp_angle_deg")
+            st.slider(r"WP Fast Axis Angle $\Delta$ (Degrees)", 0.0, 180.0, step=0.5, key="wp_angle_deg")
             st.slider(r"WP Retardance $\Gamma$ ($\times \pi$ rad)", 0.0, 2.0, step=0.125, key="retardance_pi")
         elif st.session_state.show_toggles:
             st.write("Removed. Vacuum propagation.")
@@ -300,7 +300,7 @@ with col3:
             st.checkbox("Insert Polarizer", key="insert_pol")
 
         if st.session_state.insert_pol:
-            st.slider("Transmission Axis (Degrees)", 0.0, 180.0, step=1.0, key="pol_angle_deg")
+            st.slider(r"Transmission Axis $\theta$ (Degrees)", 0.0, 180.0, step=1.0, key="pol_angle_deg")
         elif st.session_state.show_toggles:
             st.write("Removed. Unobstructed beam.")
 
@@ -314,14 +314,14 @@ with col4:
         st.checkbox("Show Poincaré Sphere(s)", key="show_poincare")
 
 # --- 5. VISUALIZATION ---
-spatial_title = f"Spatial Propagation<br>(Intensity: {intensity_percent:.1f}%)" if st.session_state.insert_pol else "Spatial Propagation"
+spatial_title = f"Spatial Propagation"
 
 has_two_spheres = st.session_state.insert_wp or st.session_state.insert_pol
 
 if st.session_state.show_poincare:
     if has_two_spheres:
         incident_title = "Incident State<br>(with WP Operator)" if st.session_state.insert_wp else "Incident State"
-        transmitted_title = "Transmitted State<br>(with Polarizer Operator)" if st.session_state.insert_pol else "Transmitted State"
+        transmitted_title = f"Transmitted State<br>(with Polarizer Operator)<br>(Intensity: {intensity_percent:.1f}%)" if st.session_state.insert_pol else "Transmitted State"
         fig = make_subplots(
             rows=1, cols=3,
             specs=[[{"type": "scene"}, {"type": "scene"}, {"type": "scene"}]],
@@ -412,21 +412,44 @@ if st.session_state.insert_wp:
             sizemode="absolute", sizeref=0.3, anchor="tail", hoverinfo='skip', showlegend=False
         ), row=1, col=spatial_col)
 
+        # Draw physical angle arc for WP (Δ)
+        fig.add_trace(go.Scatter3d(x=[z_wp_in, z_wp_in], y=[0, 1.5], z=[0, 0], mode='lines',
+                                   line=dict(color='gray', dash='dot', width=2), hoverinfo='skip', showlegend=False),
+                      row=1, col=spatial_col)
+        if wp_angle > 0.01:
+            arc_t = np.linspace(0, wp_angle, 20)
+            arc_r = 0.6
+            fig.add_trace(go.Scatter3d(x=[z_wp_in] * 20, y=arc_r * np.cos(arc_t), z=arc_r * np.sin(arc_t), mode='lines',
+                                       line=dict(color='orange', width=2), hoverinfo='skip', showlegend=False), row=1,
+                          col=spatial_col)
+            fig.add_trace(go.Scatter3d(x=[z_wp_in], y=[(arc_r + 0.2) * np.cos(wp_angle / 2)],
+                                       z=[(arc_r + 0.2) * np.sin(wp_angle / 2)],
+                                       mode='text', text=['Δ'], textfont=dict(color='orange', size=15),
+                                       hoverinfo='skip', showlegend=False), row=1, col=spatial_col)
+
 if st.session_state.insert_pol:
     draw_optical_element(z_pol, z_pol, 'cyan', 'Polarizer', False)
     if st.session_state.show_axis:
         ta_x = [-1.5 * np.cos(pol_angle), 1.5 * np.cos(pol_angle)]
         ta_y = [-1.5 * np.sin(pol_angle), 1.5 * np.sin(pol_angle)]
+        # Render ONLY the solid line for the Polarizer (No Arrowheads)
         fig.add_trace(go.Scatter3d(x=[z_pol, z_pol], y=ta_x, z=ta_y, mode='lines', line=dict(color='cyan', width=5),
                                    name='Transmission Axis'), row=1, col=spatial_col)
 
-        # Polarizer Transmission Axis Arrowheads (Cyan)
-        fig.add_trace(go.Cone(
-            x=[z_pol, z_pol], y=ta_x, z=ta_y,
-            u=[0, 0], v=[-np.cos(pol_angle), np.cos(pol_angle)], w=[-np.sin(pol_angle), np.sin(pol_angle)],
-            colorscale=[[0, 'cyan'], [1, 'cyan']], showscale=False,
-            sizemode="absolute", sizeref=0.3, anchor="tip", hoverinfo='skip', showlegend=False
-        ), row=1, col=spatial_col)
+        # Draw physical angle arc for Polarizer (θ)
+        fig.add_trace(go.Scatter3d(x=[z_pol, z_pol], y=[0, 1.5], z=[0, 0], mode='lines',
+                                   line=dict(color='gray', dash='dot', width=2), hoverinfo='skip', showlegend=False),
+                      row=1, col=spatial_col)
+        if pol_angle > 0.01:
+            arc_t = np.linspace(0, pol_angle, 20)
+            arc_r = 0.6
+            fig.add_trace(go.Scatter3d(x=[z_pol] * 20, y=arc_r * np.cos(arc_t), z=arc_r * np.sin(arc_t), mode='lines',
+                                       line=dict(color='cyan', width=2), hoverinfo='skip', showlegend=False), row=1,
+                          col=spatial_col)
+            fig.add_trace(go.Scatter3d(x=[z_pol], y=[(arc_r + 0.2) * np.cos(pol_angle / 2)],
+                                       z=[(arc_r + 0.2) * np.sin(pol_angle / 2)],
+                                       mode='text', text=['θ'], textfont=dict(color='cyan', size=15), hoverinfo='skip',
+                                       showlegend=False), row=1, col=spatial_col)
 
 if st.session_state.show_combined:
     z_final = z_pol if st.session_state.insert_pol else z_wp_out
@@ -452,16 +475,16 @@ if st.session_state.show_poincare:
                                    hoverinfo='skip', showlegend=False), row=row, col=col)
 
         fig.add_trace(go.Scatter3d(x=[0, stokes_vec[0]], y=[0, stokes_vec[1]], z=[0, stokes_vec[2]], mode='lines',
-                                   line=dict(color='cyan', width=4), hoverinfo='skip', showlegend=False), row=row,
+                                   line=dict(color='green', width=4), hoverinfo='skip', showlegend=False), row=row,
                       col=col)
 
-        # State Vector Arrowhead (Cyan)
+        # State Vector Arrowhead (Green)
         stokes_norm = np.linalg.norm(stokes_vec)
         if stokes_norm > 1e-4:
             fig.add_trace(go.Cone(
                 x=[stokes_vec[0]], y=[stokes_vec[1]], z=[stokes_vec[2]],
                 u=[stokes_vec[0] / stokes_norm], v=[stokes_vec[1] / stokes_norm], w=[stokes_vec[2] / stokes_norm],
-                colorscale=[[0, 'cyan'], [1, 'cyan']], showscale=False,
+                colorscale=[[0, 'green'], [1, 'green']], showscale=False,
                 sizemode="absolute", sizeref=0.15, anchor="tip", hoverinfo='skip', showlegend=False
             ), row=row, col=col)
 
@@ -484,6 +507,19 @@ if st.session_state.show_poincare:
                 colorscale=[[0, 'orange'], [1, 'orange']], showscale=False, sizemode="absolute",
                 sizeref=0.15, anchor="tail", hoverinfo='skip', showlegend=False
             ), row=1, col=sphere1_col)
+
+            # Add 2*Delta arc on the WP sphere equator
+            if wp_angle > 0.01:
+                arc_t2 = np.linspace(0, 2 * wp_angle, 30)
+                arc_r2 = 0.6
+                fig.add_trace(
+                    go.Scatter3d(x=arc_r2 * np.cos(arc_t2), y=arc_r2 * np.sin(arc_t2), z=np.zeros_like(arc_t2),
+                                 mode='lines', line=dict(color='orange', width=3), hoverinfo='skip',
+                                 showlegend=False), row=1, col=sphere1_col)
+                fig.add_trace(
+                    go.Scatter3d(x=[(arc_r2 + 0.2) * np.cos(wp_angle)], y=[(arc_r2 + 0.2) * np.sin(wp_angle)], z=[0],
+                                 mode='text', text=['2Δ'], textfont=dict(color='orange', size=15),
+                                 hoverinfo='skip', showlegend=False), row=1, col=sphere1_col)
 
             if retardance > 0:
                 center = np.array([n_x, n_y, 0]) * 1.15
@@ -512,17 +548,31 @@ if st.session_state.show_poincare:
 
         if st.session_state.insert_pol:
             fig.add_trace(go.Scatter3d(x=[0, S_pol_axis[0]], y=[0, S_pol_axis[1]], z=[0, S_pol_axis[2]], mode='lines',
-                                       line=dict(color='white', width=4, dash='dashdot'), hoverinfo='skip',
+                                       line=dict(width=4, dash='dashdot'), hoverinfo='skip',
                                        showlegend=False), row=1, col=sphere2_col)
-            fig.add_trace(go.Scatter3d(x=[S_pol_axis[0]], y=[S_pol_axis[1]], z=[S_pol_axis[2]], mode='markers+text',
-                                       marker=dict(color='white', size=6), text=[f"Pol ({intensity_percent:.0f}%)<br>"],
-                                       textposition='top center', textfont=dict(color='white', size=12),
+            # Render ONLY the text label for the Polarizer on the Sphere (No Marker Dot)
+            fig.add_trace(go.Scatter3d(x=[S_pol_axis[0]], y=[S_pol_axis[1]], z=[S_pol_axis[2]], mode='text',
+                                       text=[f"Pol ({intensity_percent:.0f}%)<br>"],
+                                       textposition='top center', textfont=dict(size=12),
                                        hoverinfo='skip',
                                        showlegend=False), row=1, col=sphere2_col)
             fig.add_trace(
                 go.Scatter3d(x=[S_out[0], S_pol_axis[0]], y=[S_out[1], S_pol_axis[1]], z=[S_out[2], S_pol_axis[2]],
                              mode='lines', line=dict(color='rgba(255, 255, 255, 0.4)', width=2, dash='dot'),
                              hoverinfo='skip', showlegend=False), row=1, col=sphere2_col)
+
+            # Add 2*Theta arc on the Polarizer sphere equator
+            if pol_angle > 0.01:
+                arc_t2 = np.linspace(0, 2 * pol_angle, 30)
+                arc_r2 = 0.6
+                fig.add_trace(
+                    go.Scatter3d(x=arc_r2 * np.cos(arc_t2), y=arc_r2 * np.sin(arc_t2), z=np.zeros_like(arc_t2),
+                                 mode='lines', line=dict(color='cyan', width=3), hoverinfo='skip',
+                                 showlegend=False), row=1, col=sphere2_col)
+                fig.add_trace(
+                    go.Scatter3d(x=[(arc_r2 + 0.2) * np.cos(pol_angle)], y=[(arc_r2 + 0.2) * np.sin(pol_angle)], z=[0],
+                                 mode='text', text=['2θ'], textfont=dict(color='cyan', size=15),
+                                 hoverinfo='skip', showlegend=False), row=1, col=sphere2_col)
 
     else:
         add_poincare_sphere(fig, row=1, col=sphere1_col, stokes_vec=S_in, name_prefix="Incident")
