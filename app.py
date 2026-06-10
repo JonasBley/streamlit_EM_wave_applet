@@ -282,7 +282,7 @@ target_met = check_target_met(step_data.get("target", {}), derived_state)
 
 if not is_last_step:
     # Set up layout for top inline buttons (without the solve button)
-    col_btn_hint, col_btn_next, _spacer = st.columns([1.4, 1.8, 6.8])
+    col_btn_hint, col_btn_next, _spacer = st.columns([1.2, 1.8, 7.])
 
     with col_btn_hint:
         if "hint" in step_data:
@@ -583,6 +583,6 @@ st.plotly_chart(fig, use_container_width=True, config=plot_config)
 # --- 6. SOLUTION BUTTON (BOTTOM LEFT) ---
 if not is_last_step and "solution" in step_data:
     st.markdown("<br>", unsafe_allow_html=True)
-    col_bottom_btn, _ = st.columns([1.8, 8.2])
+    col_bottom_btn, _ = st.columns([1.5, 8.5])
     with col_bottom_btn:
         st.button("✅ Show Solution", on_click=solve_challenge, use_container_width=True)
