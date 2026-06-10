@@ -46,7 +46,7 @@ CHALLENGES = {
             {
                 "text": r"<b>Step 5: Rotating the wave plate</b> Turning the wave plate by an angle $\theta$ is equivalent to a coordinate transformation of the $x$-$y$ plane—a rotation back and forth using the rotation matrix $\mathbf{R}(\theta) = \begin{pmatrix} \cos\theta & -\sin\theta \\ \sin\theta & \cos\theta \end{pmatrix}$. The combined operator is $\mathbf{M}(\theta, \Gamma) = \mathbf{R}(-\theta) \mathbf{M}(\Gamma) \mathbf{R}(\theta)$. The Retardance $\Gamma$ is characterized by the rotation angle, and the Fast Axis Angle $\Delta$ is represented by the azimuthal angle $2\Delta$ of the WP operator axis on the equator of the sphere.",
                 "task": r"Starting with a right-handed circularly polarized incident wave ($E_x = E_z = \frac{1}{\sqrt{2}}$ and $\varphi=\frac{\pi}{2}$), find the <i>Fast Axis Angle</i> $\Delta$ necessary to output a <b>Vertical</b> state.",
-                "hint": r"Rotating a right-handed circularly polarized vector to a vertical one requires a $pi/2$ rotation on the sphere, i.e., a quarter-wave plate with retardance $pi/2$. The rotation axis must be chosen such that the vector travels clockwise around the sphere, meaning it has to be rotated by more than 90 degrees counterclockwise.",
+                "hint": r"Rotating a right-handed circularly polarized vector to a vertical one requires a $\pi/2$ rotation on the sphere. The rotation axis must be chosen such that the vector travels clockwise around the sphere, meaning it has to be rotated by more than 90 degrees counterclockwise.",
                 "setup": {"insert_wp": True, "E_x_amp": 0.707, "phase_relative_pi": 0.5, "wp_angle_deg": 0.0, "retardance_pi": 0.5, "show_toggles": False},
                 "target": {"E_x_amp": 0.707, "phase_relative_pi": 0.5, "retardance_pi": 0.5, "wp_angle_deg": 135.0},
                 "solution": {"E_x_amp": 0.707, "phase_relative_pi": 0.5, "retardance_pi": 0.5, "wp_angle_deg": 135.0}
@@ -54,7 +54,7 @@ CHALLENGES = {
             {
                 "text": r"<b>Step 6: Mastering Wave Plates</b><br>As a reminder, a wave plate is a unitary operator that acts as a pure geometric rotation on the sphere. The rotation axis lies on the equator at an azimuthal angle $2\Delta$ (where $\Delta$ is the physical <i>Fast Axis Angle</i>), and the rotation amount is the <i>Retardance</i> $\Gamma$. Let's test your intuition.",
                 "task": r"Start with a <b>Horizontal</b> incident wave. Find the Retardance and the Fast Axis Angle needed to rotate the state to create a <b>Diagonal</b> state.",
-                "hint": r"To travel along the equator (Horizontal) to the Diagonal state, your rotation axis on the sphere needs to reflect around an axis that is exactly $45^\circ$ away from Horizontal.",
+                "hint": r"To travel along the equator (Horizontal) to the Diagonal state, your rotation axis on the sphere needs to reflect around an axis that is between the horizontal and diagonal axes on the sphere.",
                 "setup": {"wp_angle_deg": 0.0, "retardance_pi": 0.0, "E_x_amp": 1.0, "phase_relative_pi": 0.0, "show_toggles": False},
                 "target": {"E_x_amp": 1.0, "S_final": [0, 1, 0]},
                 "solution": {"retardance_pi": 1.0, "wp_angle_deg": 22.5}
@@ -76,7 +76,7 @@ CHALLENGES = {
                 "solution": {"retardance_pi": 0.5, "wp_angle_deg": 45.0, "pol_angle_deg": 0.0}
             },
             {
-                "text": r"Done. Congratulations, you completed the tutorial. Feel free to play around with the applet!",
+                "text": r"Done. Congratulations, you completed the tutorial. The codeword to proceed in the study is <b>vertically polarized</b>. Feel free to play around with the applet!<br>",
                 "task": r"",
                 "setup": {"insert_wp": True, "insert_pol": True, "show_toggles": True},
                 "target": {}
