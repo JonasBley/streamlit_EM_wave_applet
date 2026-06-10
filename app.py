@@ -53,6 +53,20 @@ def toggle_hint():
     st.session_state.show_hint = not st.session_state.show_hint
 
 
+def solve_challenge():
+    """Resets the step to its baseline setup, then applies the solution parameters."""
+    challenge_name = st.session_state.current_challenge
+    step_index = st.session_state.current_step
+    step_data = CHALLENGES[challenge_name]["steps"][step_index]
+
+    # 1. Reset the board to undo any incorrect user meddling
+    load_step_setup(challenge_name, step_index)
+
+    # 2. Apply the specific solution over the clean board
+    for k, v in step_data.get("solution", {}).items():
+        st.session_state[k] = v
+
+
 # --- 2. PHYSICS EXTRACTION & SIMULATION ---
 E_x_amp = st.session_state.E_x_amp
 E_y_amp = np.sqrt(1.0 - E_x_amp ** 2)
@@ -196,22 +210,36 @@ step_data = challenge_data[st.session_state.current_step]
 is_last_step = st.session_state.current_step >= len(challenge_data) - 1
 
 
-def replace_inline_math(match):
-    latex_code = match.group(1)
-    return latex_to_mathml(latex_code)
+def process_math(text):
+    """Robustly parses LaTeX. Handles $$ block equations and $ inline equations safely."""
+    if not text:
+        return ""
+
+    def replace_block(match):
+        code = match.group(1).strip()
+        if not code: return ""
+        try:
+            mathml = latex_to_mathml(code, display="block")
+            return f"<div style='text-align: center; margin: 15px 0; font-size: 110%;'>{mathml}</div>"
+        except Exception:
+            return f"$$ {code} $$"
+
+    def replace_inline(match):
+        code = match.group(1).strip()
+        if not code: return ""
+        try:
+            return latex_to_mathml(code)
+        except Exception:
+            return f"${code}$"
+
+    # Extract block math first, then inline math
+    text = re.sub(r'\$\$(.*?)\$\$', replace_block, text, flags=re.DOTALL)
+    text = re.sub(r'\$(.*?)\$', replace_inline, text, flags=re.DOTALL)
+    return text
 
 
-raw_text = step_data.get('text', '')
-processed_text = re.sub(r'\$(.*?)\$', replace_inline_math, raw_text)
-
-raw_task = step_data.get('task', '')
-processed_task = re.sub(r'\$(.*?)\$', replace_inline_math, raw_task)
-
-mathml_html = ""
-if "latex" in step_data:
-    raw_latex = step_data["latex"]
-    compiled_mathml = latex_to_mathml(raw_latex, display="block")
-    mathml_html = f"<div style='margin-top: 15px; font-size: 110%; text-align: center;'>{compiled_mathml}</div>"
+processed_text = process_math(step_data.get('text', ''))
+processed_task = process_math(step_data.get('task', ''))
 
 # 1. Explanation Box (Yellow)
 if processed_text:
@@ -220,7 +248,6 @@ if processed_text:
         <div style="background-color: #fff9c4; color: black; padding: 20px; 
                     border-radius: 8px; font-size: 16px; border: 2px solid #fbc02d; margin-bottom: 15px;">
             <div style="line-height: 1.6;">📖 {processed_text}</div>
-            {mathml_html}
         </div>
         """,
         unsafe_allow_html=True
@@ -240,8 +267,7 @@ if processed_task:
 
 # 3. Hint Box (Green)
 if st.session_state.show_hint and "hint" in step_data:
-    raw_hint = step_data["hint"]
-    processed_hint = re.sub(r'\$(.*?)\$', replace_inline_math, raw_hint)
+    processed_hint = process_math(step_data.get("hint", ""))
     st.markdown(
         f"""
         <div style="background-color: #e8f5e9; color: black; padding: 15px; 
@@ -255,14 +281,21 @@ if st.session_state.show_hint and "hint" in step_data:
 target_met = check_target_met(step_data.get("target", {}), derived_state)
 
 if not is_last_step:
-    # Set up layout for inline buttons
-    col_btn_hint, col_btn_next, _ = st.columns([1, 1.5, 7])
+    # Set up layout for top inline buttons (without the solve button)
+    col_btn_hint, col_btn_next, _spacer = st.columns([1.4, 1.8, 6.8])
+
     with col_btn_hint:
         if "hint" in step_data:
-            btn_text = "Hide Hint" if st.session_state.show_hint else "💡 Hint"
-            st.button(btn_text, on_click=toggle_hint)
+            # Keep the emoji on BOTH states so the baseline alignment
+            # and button height don't jump when clicked!
+            btn_text = "💡 Hide Hint" if st.session_state.show_hint else "💡 Show Hint"
+
+            # use_container_width forces it to center nicely in the column
+            st.button(btn_text, on_click=toggle_hint, use_container_width=True)
+
     with col_btn_next:
-        st.button("Next Step ➔", disabled=not target_met, on_click=next_step)
+        st.button("👣 Next Step ➔", disabled=not target_met, on_click=next_step)
+
 elif st.session_state.current_challenge != "Free Play":
     st.success("Challenge Completed!")
 
@@ -279,7 +312,6 @@ with col1:
     st.slider(r"Relative Phase $\varphi$ ($\times\pi$ rad)", 0.0, 2.0, step=0.125, key="phase_relative_pi")
 
 with col2:
-    # Only display the WP section if toggles are ON or if the WP is actively inserted
     if st.session_state.show_toggles or st.session_state.insert_wp:
         st.subheader("Wave Plate (WP)")
 
@@ -293,7 +325,6 @@ with col2:
             st.write("Removed. Vacuum propagation.")
 
 with col3:
-    # Only display the Polarizer section if toggles are ON or if it's actively inserted
     if st.session_state.show_toggles or st.session_state.insert_pol:
         st.subheader("Linear Polarizer")
 
@@ -306,7 +337,6 @@ with col3:
             st.write("Removed. Unobstructed beam.")
 
 with col4:
-    # Hide the entire visualization column options during challenges
     if st.session_state.show_toggles:
         st.subheader("Visualization Toggles")
         st.checkbox("Combined Wave (Green)", key="show_combined")
@@ -318,10 +348,8 @@ with col4:
 # --- 5. VISUALIZATION ---
 spatial_title = f"Spatial Propagation<br>(Intensity: {intensity_percent:.1f}%)" if st.session_state.insert_pol else "Spatial Propagation"
 
-# Flag to determine if we need the right-side sphere
 has_two_spheres = st.session_state.insert_wp or st.session_state.insert_pol
 
-# --- DYNAMIC COLUMN-BASED GRID LAYOUT ---
 if st.session_state.show_poincare:
     if has_two_spheres:
         incident_title = "Incident State<br>(with WP Operator)" if st.session_state.insert_wp else "Incident State"
@@ -352,7 +380,6 @@ else:
     )
     spatial_col = 1
 
-# Spatial rendering
 if st.session_state.show_combined:
     fig.add_trace(go.Scatter3d(x=z, y=Ex, z=Ey, mode='lines', line=dict(color='green', width=4), name='Combined Wave'),
                   row=1, col=spatial_col)
@@ -459,29 +486,30 @@ if st.session_state.show_poincare:
                                        showlegend=False),
                           row=1, col=sphere1_col)
 
-            center = np.array([n_x, n_y, 0]) * 1.15
-            e1, e2 = np.array([-n_y, n_x, 0]), np.array([0, 0, 1])
-            arc_t = np.linspace(0, retardance, 40)
-            radius = 0.25
-            arc_x = center[0] + radius * (np.cos(arc_t) * e1[0] + np.sin(arc_t) * e2[0])
-            arc_y = center[1] + radius * (np.cos(arc_t) * e1[1] + np.sin(arc_t) * e2[1])
-            arc_z = center[2] + radius * (np.cos(arc_t) * e1[2] + np.sin(arc_t) * e2[2])
+            if retardance > 0:
+                center = np.array([n_x, n_y, 0]) * 1.15
+                e1, e2 = np.array([-n_y, n_x, 0]), np.array([0, 0, 1])
+                arc_t = np.linspace(0, retardance, 40)
+                radius = 0.25
+                arc_x = center[0] + radius * (np.cos(arc_t) * e1[0] + np.sin(arc_t) * e2[0])
+                arc_y = center[1] + radius * (np.cos(arc_t) * e1[1] + np.sin(arc_t) * e2[1])
+                arc_z = center[2] + radius * (np.cos(arc_t) * e1[2] + np.sin(arc_t) * e2[2])
 
-            fig.add_trace(go.Scatter3d(x=arc_x, y=arc_y, z=arc_z, mode='lines', line=dict(color='gold', width=4),
-                                       hoverinfo='skip', showlegend=False), row=1, col=sphere1_col)
+                fig.add_trace(go.Scatter3d(x=arc_x, y=arc_y, z=arc_z, mode='lines', line=dict(color='gold', width=4),
+                                           hoverinfo='skip', showlegend=False), row=1, col=sphere1_col)
 
-            u_dir = radius * (-np.sin(retardance) * e1[0] + np.cos(retardance) * e2[0])
-            v_dir = radius * (-np.sin(retardance) * e1[1] + np.cos(retardance) * e2[1])
-            w_dir = radius * (-np.sin(retardance) * e1[2] + np.cos(retardance) * e2[2])
-            fig.add_trace(go.Cone(x=[arc_x[-1]], y=[arc_y[-1]], z=[arc_z[-1]], u=[u_dir], v=[v_dir], w=[w_dir],
-                                  colorscale=[[0, 'gold'], [1, 'gold']], showscale=False, sizemode="absolute",
-                                  sizeref=0.1, anchor="tail", hoverinfo='skip', showlegend=False), row=1,
-                          col=sphere1_col)
-            fig.add_trace(go.Scatter3d(x=[arc_x[-1]], y=[arc_y[-1]], z=[arc_z[-1]], mode='text',
-                                       text=[f"Γ = {st.session_state.retardance_pi:.2f}π"],
-                                       textposition='top right',
-                                       textfont=dict(color='gold', size=12), hoverinfo='skip', showlegend=False),
-                          row=1, col=sphere1_col)
+                u_dir = radius * (-np.sin(retardance) * e1[0] + np.cos(retardance) * e2[0])
+                v_dir = radius * (-np.sin(retardance) * e1[1] + np.cos(retardance) * e2[1])
+                w_dir = radius * (-np.sin(retardance) * e1[2] + np.cos(retardance) * e2[2])
+                fig.add_trace(go.Cone(x=[arc_x[-1]], y=[arc_y[-1]], z=[arc_z[-1]], u=[u_dir], v=[v_dir], w=[w_dir],
+                                      colorscale=[[0, 'gold'], [1, 'gold']], showscale=False, sizemode="absolute",
+                                      sizeref=0.1, anchor="tail", hoverinfo='skip', showlegend=False), row=1,
+                              col=sphere1_col)
+                fig.add_trace(go.Scatter3d(x=[arc_x[-1]], y=[arc_y[-1]], z=[arc_z[-1]], mode='text',
+                                           text=[f"Γ = {st.session_state.retardance_pi:.2f}π"],
+                                           textposition='top right',
+                                           textfont=dict(color='gold', size=12), hoverinfo='skip', showlegend=False),
+                              row=1, col=sphere1_col)
 
         if st.session_state.insert_pol:
             fig.add_trace(go.Scatter3d(x=[0, S_pol_axis[0]], y=[0, S_pol_axis[1]], z=[0, S_pol_axis[2]], mode='lines',
@@ -506,7 +534,7 @@ scene_spatial_config = dict(
     yaxis=dict(title='E<sub>x</sub>', range=[-1.5, 1.5]),
     zaxis=dict(title='E<sub>y</sub>', range=[-1.5, 1.5]),
     aspectratio=dict(x=4 if st.session_state.insert_pol else 3, y=1, z=1),
-    camera=dict(eye=dict(x=1.2, y=-4.2, z=1.2))
+    camera=dict(eye=dict(x=1.2, y=-3.8, z=1.2))
 )
 
 scene_poincare_config = dict(
@@ -514,7 +542,7 @@ scene_poincare_config = dict(
     yaxis=dict(title='', range=[-1.2, 1.2], showticklabels=False, showgrid=False, zeroline=False),
     zaxis=dict(title='', range=[-1.2, 1.2], showticklabels=False, showgrid=False, zeroline=False),
     aspectratio=dict(x=1, y=1, z=1),
-    camera=dict(eye=dict(x=4.2, y=4.2, z=4.2))
+    camera=dict(eye=dict(x=2.8, y=2.8, z=2.8))
 )
 
 for annotation in fig['layout']['annotations']:
@@ -551,3 +579,10 @@ plot_config = {
 }
 
 st.plotly_chart(fig, use_container_width=True, config=plot_config)
+
+# --- 6. SOLUTION BUTTON (BOTTOM LEFT) ---
+if not is_last_step and "solution" in step_data:
+    st.markdown("<br>", unsafe_allow_html=True)
+    col_bottom_btn, _ = st.columns([1.8, 8.2])
+    with col_bottom_btn:
+        st.button("✅ Show Solution", on_click=solve_challenge, use_container_width=True)
