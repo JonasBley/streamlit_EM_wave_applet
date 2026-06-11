@@ -3,12 +3,22 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import re
+import random
 from challenges import CHALLENGES
 from latex2mathml.converter import convert as latex_to_mathml
 
 st.set_page_config(page_title="Interactive Polarization Challenges", layout="wide")
 
-# --- 1. SESSION STATE & TUTORIAL ENGINE ---
+# --- 1. SESSION STATE, COHORT ASSIGNMENT & TUTORIAL ENGINE ---
+
+# Randomly assign participant to a specific journey on their first load
+if "assigned_journey" not in st.session_state:
+    # Ensure the keys exactly match the dictionary keys in challenges.py
+    st.session_state.assigned_journey = random.choice([
+        "Polarization 1",
+        "Polarization 2"
+    ])
+
 DEFAULTS = {
     "E_x_amp": 0.707, "phase_relative_pi": 0.0,
     "insert_wp": True, "wp_angle_deg": 45.0, "retardance_pi": 0.5,
@@ -32,7 +42,8 @@ def load_step_setup(challenge_name, step_index):
 
 if "tutorial_initialized" not in st.session_state:
     st.session_state.tutorial_initialized = True
-    st.session_state.current_challenge = list(CHALLENGES.keys())[0]
+    # Lock the current challenge to the assigned journey
+    st.session_state.current_challenge = st.session_state.assigned_journey
     st.session_state.current_step = 0
     load_step_setup(st.session_state.current_challenge, 0)
 
@@ -200,10 +211,9 @@ def check_target_met(target_dict, derived):
 # --- 3. UI: HEADER AND TUTORIAL BOX ---
 st.title("Polarization of Light")
 
-col_chal, col_step = st.columns([1, 3])
-with col_chal:
-    st.selectbox("Select Mode / Challenge:", list(CHALLENGES.keys()),
-                 key="current_challenge", on_change=reset_challenge)
+# Selector completely removed to enforce the assigned cohort.
+# A subtle indicator can remain, or it can be completely hidden.
+st.caption(f"Active Module: {st.session_state.assigned_journey}")
 
 challenge_data = CHALLENGES[st.session_state.current_challenge]["steps"]
 step_data = challenge_data[st.session_state.current_step]
@@ -645,7 +655,6 @@ if st.session_state.show_hint and "hint" in step_data:
     )
 
 # New Post-Completion Explanation Box (Light Blue)
-# This box activates automatically once target parameters are met, matching the Next Step button lifecycle
 if target_met and "explanation" in step_data and step_data["explanation"]:
     processed_explanation = process_math(step_data.get("explanation", ""))
     st.markdown(
