@@ -348,9 +348,6 @@ else:
     )
     spatial_col = 1
 
-if st.session_state.show_combined:
-    fig.add_trace(go.Scatter3d(x=z, y=Ex, z=Ey, mode='lines', line=dict(color='green', width=4), name='Combined Wave'),
-                  row=1, col=spatial_col)
 if st.session_state.show_ex:
     fig.add_trace(
         go.Scatter3d(x=z, y=Ex, z=zeros, mode='lines', line=dict(color='blue', width=3),
@@ -360,6 +357,9 @@ if st.session_state.show_ey:
     fig.add_trace(
         go.Scatter3d(x=z, y=zeros, z=Ey, mode='lines', line=dict(color='red', width=3), name='E<sub>y</sub> Component'),
         row=1, col=spatial_col)
+if st.session_state.show_combined:
+    fig.add_trace(go.Scatter3d(x=z, y=Ex, z=Ey, mode='lines', line=dict(color='green', width=4), name='Combined Wave'),
+                  row=1, col=spatial_col)
 
 
 def draw_optical_element(z_in, z_out, color, name, is_volume=True):

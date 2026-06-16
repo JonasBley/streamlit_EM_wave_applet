@@ -4,12 +4,16 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import re
 import random
+import uuid
+from datetime import datetime
+import pandas as pd
+from streamlit_gsheets import GSheetsConnection
 from challenges import CHALLENGES
 from latex2mathml.converter import convert as latex_to_mathml
 
 st.set_page_config(page_title="Interactive Polarization Challenges", layout="wide")
 
-# --- 1. SESSION STATE, COHORT ASSIGNMENT & TUTORIAL ENGINE ---
+# --- 1. SESSION STATE, COHORT ASSIGNMENT & LOGGING ENGINE ---
 
 # Randomly assign participant to a specific journey on their first load
 if "assigned_journey" not in st.session_state:
@@ -18,6 +22,9 @@ if "assigned_journey" not in st.session_state:
         "Polarization 1",
         "Polarization 2"
     ])
+
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
 
 DEFAULTS = {
     "E_x_amp": 0.707, "phase_relative_pi": 0.0,
@@ -34,6 +41,41 @@ for k, v in DEFAULTS.items():
         st.session_state[k] = v
 
 
+def log_action(action_name):
+    """Packages the current app state and safely writes it to Google Sheets."""
+    try:
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        existing_data = conn.read()
+
+        log_entry = {
+            "timestamp": datetime.now().isoformat(),
+            "session_id": st.session_state.session_id,
+            "cohort": st.session_state.assigned_journey,
+            "current_step": st.session_state.current_step,
+            "action": action_name,
+            "E_x_amp": st.session_state.get("E_x_amp", ""),
+            "phase_relative_pi": st.session_state.get("phase_relative_pi", ""),
+            "insert_wp": st.session_state.get("insert_wp", ""),
+            "wp_angle_deg": st.session_state.get("wp_angle_deg", ""),
+            "retardance_pi": st.session_state.get("retardance_pi", ""),
+            "insert_pol": st.session_state.get("insert_pol", ""),
+            "pol_angle_deg": st.session_state.get("pol_angle_deg", "")
+        }
+
+        new_data = pd.DataFrame([log_entry])
+
+        # Check if sheet is empty to handle initial headers
+        if existing_data.empty or existing_data.dropna(how='all').empty:
+            updated_df = new_data
+        else:
+            updated_df = pd.concat([existing_data, new_data], ignore_index=True)
+
+        conn.update(data=updated_df)
+    except Exception as e:
+        # Fails silently so a network/API issue doesn't crash the student's exam
+        print(f"Logging Error: {e}")
+
+
 def load_step_setup(challenge_name, step_index):
     step_data = CHALLENGES[challenge_name]["steps"][step_index]
     for k, v in step_data.get("setup", {}).items():
@@ -46,15 +88,18 @@ if "tutorial_initialized" not in st.session_state:
     st.session_state.current_challenge = st.session_state.assigned_journey
     st.session_state.current_step = 0
     load_step_setup(st.session_state.current_challenge, 0)
+    log_action("Started Journey")
 
 
 def reset_challenge():
     st.session_state.current_step = 0
     st.session_state.show_hint = False
     load_step_setup(st.session_state.current_challenge, 0)
+    log_action("Reset Challenge")
 
 
 def next_step():
+    log_action("Clicked Next Step")
     st.session_state.current_step += 1
     st.session_state.show_hint = False
     load_step_setup(st.session_state.current_challenge, st.session_state.current_step)
@@ -62,10 +107,13 @@ def next_step():
 
 def toggle_hint():
     st.session_state.show_hint = not st.session_state.show_hint
+    action_str = "Showed Hint" if st.session_state.show_hint else "Hid Hint"
+    log_action(action_str)
 
 
 def solve_challenge():
     """Resets the step to its baseline setup, then applies the solution parameters."""
+    log_action("Clicked Show Solution")
     challenge_name = st.session_state.current_challenge
     step_index = st.session_state.current_step
     step_data = CHALLENGES[challenge_name]["steps"][step_index]
@@ -358,9 +406,6 @@ else:
     )
     spatial_col = 1
 
-if st.session_state.show_combined:
-    fig.add_trace(go.Scatter3d(x=z, y=Ex, z=Ey, mode='lines', line=dict(color='green', width=4), name='Combined Wave'),
-                  row=1, col=spatial_col)
 if st.session_state.show_ex:
     fig.add_trace(
         go.Scatter3d(x=z, y=Ex, z=zeros, mode='lines', line=dict(color='blue', width=3),
@@ -370,6 +415,9 @@ if st.session_state.show_ey:
     fig.add_trace(
         go.Scatter3d(x=z, y=zeros, z=Ey, mode='lines', line=dict(color='red', width=3), name='E<sub>y</sub> Component'),
         row=1, col=spatial_col)
+if st.session_state.show_combined:
+    fig.add_trace(go.Scatter3d(x=z, y=Ex, z=Ey, mode='lines', line=dict(color='green', width=4), name='Combined Wave'),
+                  row=1, col=spatial_col)
 
 
 def draw_optical_element(z_in, z_out, color, name, is_volume=True):
