@@ -6,8 +6,8 @@ import re
 import random
 import uuid
 from datetime import datetime
-import pandas as pd
-from streamlit_gsheets import GSheetsConnection
+import gspread
+from google.oauth2.service_account import Credentials
 from challenges import CHALLENGES
 from latex2mathml.converter import convert as latex_to_mathml
 
@@ -41,39 +41,53 @@ for k, v in DEFAULTS.items():
         st.session_state[k] = v
 
 
+@st.cache_resource
+def get_gspread_client():
+    """Authenticates and returns a persistent Google Sheets client."""
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    creds_dict = dict(st.secrets["connections"]["gsheets"])
+    creds_dict["private_key"] = creds_dict["private_key"].replace('\\n', '\n')
+    credentials = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+    return gspread.authorize(credentials)
+
+
 def log_action(action_name):
-    """Packages the current app state and safely writes it to Google Sheets."""
+    """Safely and instantly appends a new row to Google Sheets using the cached client."""
+    SHEET_URL = "https://docs.google.com/spreadsheets/d/14u3OWvARHLNxXSSHllmBHj4wy5Lc7LTq0uMMVDFXkV0/edit"
+
     try:
-        conn = st.connection("gsheets", type=GSheetsConnection)
-        existing_data = conn.read()
+        # Get the cached client (does not re-authenticate)
+        client = get_gspread_client()
 
-        log_entry = {
-            "timestamp": datetime.now().isoformat(),
-            "session_id": st.session_state.session_id,
-            "cohort": st.session_state.assigned_journey,
-            "current_step": st.session_state.current_step,
-            "action": action_name,
-            "E_x_amp": st.session_state.get("E_x_amp", ""),
-            "phase_relative_pi": st.session_state.get("phase_relative_pi", ""),
-            "insert_wp": st.session_state.get("insert_wp", ""),
-            "wp_angle_deg": st.session_state.get("wp_angle_deg", ""),
-            "retardance_pi": st.session_state.get("retardance_pi", ""),
-            "insert_pol": st.session_state.get("insert_pol", ""),
-            "pol_angle_deg": st.session_state.get("pol_angle_deg", "")
-        }
+        # Open the sheet
+        sheet = client.open_by_url(SHEET_URL).sheet1
 
-        new_data = pd.DataFrame([log_entry])
+        # Format the data strictly as a List (array) for appending
+        log_entry = [
+            datetime.now().isoformat(),
+            st.session_state.session_id,
+            st.session_state.assigned_journey,
+            st.session_state.current_step,
+            action_name,
+            st.session_state.get("E_x_amp", ""),
+            st.session_state.get("phase_relative_pi", ""),
+            st.session_state.get("insert_wp", ""),
+            st.session_state.get("wp_angle_deg", ""),
+            st.session_state.get("retardance_pi", ""),
+            st.session_state.get("insert_pol", ""),
+            st.session_state.get("pol_angle_deg", "")
+        ]
 
-        # Check if sheet is empty to handle initial headers
-        if existing_data.empty or existing_data.dropna(how='all').empty:
-            updated_df = new_data
-        else:
-            updated_df = pd.concat([existing_data, new_data], ignore_index=True)
+        # Blind append - lightning fast
+        sheet.append_row(log_entry)
 
-        conn.update(data=updated_df)
+
     except Exception as e:
-        # Fails silently so a network/API issue doesn't crash the student's exam
-        print(f"Logging Error: {e}")
+        # Push the exact error message to the Streamlit UI
+        st.error(f"Google API Error: {e}")
 
 
 def load_step_setup(challenge_name, step_index):
@@ -88,7 +102,6 @@ if "tutorial_initialized" not in st.session_state:
     st.session_state.current_challenge = st.session_state.assigned_journey
     st.session_state.current_step = 0
     load_step_setup(st.session_state.current_challenge, 0)
-    log_action("Started Journey")
 
 
 def reset_challenge():
@@ -260,7 +273,6 @@ def check_target_met(target_dict, derived):
 st.title("Polarization of Light")
 
 # Selector completely removed to enforce the assigned cohort.
-# A subtle indicator can remain, or it can be completely hidden.
 st.caption(f"Active Module: {st.session_state.assigned_journey}")
 
 challenge_data = CHALLENGES[st.session_state.current_challenge]["steps"]
@@ -730,3 +742,9 @@ if not is_last_step:
     with col_btn_solve:
         if "solution" in step_data:
             st.button("✅ Show Solution", on_click=solve_challenge, use_container_width=True)
+
+# --- 7. POST-RENDER INITIALIZATION LOGGING ---
+# This ensures the first load doesn't hang before drawing the UI
+if "logged_start" not in st.session_state:
+    log_action("Started Journey")
+    st.session_state.logged_start = True
