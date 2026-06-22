@@ -654,15 +654,15 @@ if st.session_state.show_poincare:
                                  mode='text', text=['2Δ'], textfont=dict(color='orange', size=15),
                                  hoverinfo='skip', showlegend=False), row=1, col=sphere1_col)
 
-            if retardance > 0:
-                center = np.array([n_x, n_y, 0]) * 1.15
-                e1, e2 = np.array([-n_y, n_x, 0]), np.array([0, 0, 1])
-                arc_t = np.linspace(0, retardance, 40)
-                radius = 0.25
-                arc_x = center[0] + radius * (np.cos(arc_t) * e1[0] + np.sin(arc_t) * e2[0])
-                arc_y = center[1] + radius * (np.cos(arc_t) * e1[1] + np.sin(arc_t) * e2[1])
-                arc_z = center[2] + radius * (np.cos(arc_t) * e1[2] + np.sin(arc_t) * e2[2])
+            center = np.array([n_x, n_y, 0]) * 1.15
+            e1, e2 = np.array([-n_y, n_x, 0]), np.array([0, 0, 1])
+            arc_t = np.linspace(0, retardance, 40)
+            radius = 0.25
+            arc_x = center[0] + radius * (np.cos(arc_t) * e1[0] + np.sin(arc_t) * e2[0])
+            arc_y = center[1] + radius * (np.cos(arc_t) * e1[1] + np.sin(arc_t) * e2[1])
+            arc_z = center[2] + radius * (np.cos(arc_t) * e1[2] + np.sin(arc_t) * e2[2])
 
+            if retardance > 0:
                 fig.add_trace(
                     go.Scatter3d(x=arc_x, y=arc_y, z=arc_z, mode='lines', line=dict(color='darkorange', width=4),
                                  hoverinfo='skip', showlegend=False), row=1, col=sphere1_col)
