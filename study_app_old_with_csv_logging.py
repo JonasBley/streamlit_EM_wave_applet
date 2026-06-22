@@ -13,56 +13,14 @@ from latex2mathml.converter import convert as latex_to_mathml
 
 st.set_page_config(page_title="Interactive Polarization Challenges", layout="wide")
 
-# --- 0. LANDING PAGE GATEKEEPER ---
-if "show_landing" not in st.session_state:
-    st.session_state.show_landing = True
-
-if st.session_state.show_landing:
-    st.title("Welcome to the Interactive Polarization Study")
-
-    st.markdown("""
-    Thank you for participating in this study! In this module, you will interactively explore the physics of light polarization. 
-
-    Before we begin, please read how the interface works:
-    """)
-
-    st.markdown(
-        """
-        <div style="background-color: #fff9c4; color: black; padding: 15px; border-radius: 8px; border: 2px solid #fbc02d; margin-bottom: 10px;">
-            📖 <b>1. The Setting:</b> Each step begins with an explanation box like this one, introducing the physical concepts.
-        </div>
-
-        <div style="background-color: #ffe0b2; color: black; padding: 15px; border-radius: 8px; border: 2px solid #ff9800; margin-bottom: 10px;">
-            🎯 <b>2. The Task:</b> You will be given a specific objective. You must adjust the sliders or type the exact values into the number boxes to find the correct optical parameters using the 3D visualizations below.
-        </div>
-
-        <div style="background-color: #e8f5e9; color: black; padding: 15px; border-radius: 8px; border: 2px solid #4caf50; margin-bottom: 10px;">
-            💡 <b>3. Getting Help:</b> If you don't know how to proceed, you can use the <b>Show Hint</b> button below the applet. If you are entirely stuck, you can reveal the answer using the <b>Show Solution</b> button at the bottom right.
-        </div>
-
-        <div style="background-color: #e3f2fd; color: black; padding: 15px; border-radius: 8px; border: 2px solid #2196f3; margin-bottom: 25px;">
-            🎓 <b>4. Moving Forward:</b> When your sliders hit the correct values, an explanation box like this one will appear at the bottom. <b>Make sure to read it carefully</b>, and then proceed using the <b>Next Step</b> button.
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    col1, col2, col3 = st.columns([1, 1.5, 1])
-    with col2:
-        if st.button("🚀 I understand, start the tutorial!", use_container_width=True):
-            st.session_state.show_landing = False
-            st.rerun()
-
-    # Stop the rest of the script from running while the landing page is active
-    st.stop()
-
 # --- 1. SESSION STATE, COHORT ASSIGNMENT & LOGGING ENGINE ---
 
 # Randomly assign participant to a specific journey on their first load
 if "assigned_journey" not in st.session_state:
-    st.session_state.assigned_journey = "Polarization 1"
+    st.session_state.assigned_journey = random.choice([
+        "Polarization 1",
+        "Polarization 2"
+    ])
 
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
@@ -74,8 +32,7 @@ DEFAULTS = {
     "show_combined": True, "show_ex": True, "show_ey": True, "show_axis": True,
     "show_poincare": True,
     "show_hint": False,
-    "show_toggles": True,
-    "disable_keys": []  # Tracks which UI elements are currently frozen
+    "show_toggles": True
 }
 
 for k, v in DEFAULTS.items():
@@ -86,15 +43,41 @@ for k, v in DEFAULTS.items():
 def log_action(action_name):
     """Instantly writes a new row to a local CSV file. Zero network dependency."""
     pass
+    # log_entry = {
+    #     "timestamp": datetime.now().isoformat(),
+    #     "session_id": st.session_state.session_id,
+    #     "cohort": st.session_state.assigned_journey,
+    #     "current_step": st.session_state.current_step,
+    #     "action": action_name,
+    #     "e_x_amp": float(st.session_state.get("E_x_amp", 0.0)),
+    #     "phase_relative_pi": float(st.session_state.get("phase_relative_pi", 0.0)),
+    #     "insert_wp": bool(st.session_state.get("insert_wp", False)),
+    #     "wp_angle_deg": float(st.session_state.get("wp_angle_deg", 0.0)),
+    #     "retardance_pi": float(st.session_state.get("retardance_pi", 0.0)),
+    #     "insert_pol": bool(st.session_state.get("insert_pol", False)),
+    #     "pol_angle_deg": float(st.session_state.get("pol_angle_deg", 0.0))
+    # }
+    #
+    # csv_filename = "study_telemetry.csv"
+    # file_exists = os.path.isfile(csv_filename)
+    #
+    # try:
+    #     # Append mode ('a') ensures we never overwrite previous logs
+    #     with open(csv_filename, mode='a', newline='', encoding='utf-8') as f:
+    #         writer = csv.DictWriter(f, fieldnames=log_entry.keys())
+    #
+    #         # Write the header row only if the file was just created
+    #         if not file_exists:
+    #             writer.writeheader()
+    #
+    #         writer.writerow(log_entry)
+    #
+    # except Exception as e:
+    #     print(f"Local Logging Error: {e}")
 
 
 def load_step_setup(challenge_name, step_index):
     step_data = CHALLENGES[challenge_name]["steps"][step_index]
-
-    # 1. Reset disable_keys to empty to prevent frozen sliders from bleeding into the next step
-    st.session_state["disable_keys"] = []
-
-    # 2. Apply the new step's specific setup configurations
     for k, v in step_data.get("setup", {}).items():
         st.session_state[k] = v
 
@@ -338,63 +321,26 @@ target_met = check_target_met(step_data.get("target", {}), derived_state)
 if is_last_step and st.session_state.current_challenge != "Free Play":
     st.success("Challenge Completed!")
 
-
-# --- UI HELPER: SYNCHRONIZED SLIDER + NUMBER INPUT ---
-def create_synced_input(label, min_val, max_val, step_val, base_key):
-    """Creates a paired slider and number input linked to a shared session state key."""
-    slider_key = f"{base_key}_slider"
-    num_key = f"{base_key}_num"
-
-    # Check if this specific parameter is supposed to be disabled
-    is_disabled = base_key in st.session_state.get("disable_keys", [])
-
-    if (slider_key not in st.session_state) or (st.session_state[slider_key] != st.session_state[base_key]):
-        st.session_state[slider_key] = float(st.session_state[base_key])
-    if (num_key not in st.session_state) or (st.session_state[num_key] != st.session_state[base_key]):
-        st.session_state[num_key] = float(st.session_state[base_key])
-
-    def sync_from_slider():
-        st.session_state[base_key] = st.session_state[slider_key]
-        st.session_state[num_key] = st.session_state[slider_key]
-
-    def sync_from_num():
-        st.session_state[base_key] = st.session_state[num_key]
-        st.session_state[slider_key] = st.session_state[num_key]
-
-    st.markdown(label)
-
-    c1, c2 = st.columns([2.5, 1])
-    with c1:
-        st.slider(label, min_value=float(min_val), max_value=float(max_val), step=float(step_val),
-                  key=slider_key, on_change=sync_from_slider, label_visibility="collapsed", disabled=is_disabled)
-    with c2:
-        st.number_input(label, min_value=float(min_val), max_value=float(max_val), step=float(step_val),
-                        key=num_key, on_change=sync_from_num, label_visibility="collapsed", disabled=is_disabled)
-
-
 # --- 4. UI: SLIDERS & CONTROLS ---
 col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
 
 with col1:
     st.subheader(r"Incident Wave")
     st.write(r"$\vec{E} = \begin{pmatrix} E_x \\ E_y e^{i\varphi} \end{pmatrix}$")
-
-    create_synced_input(r"Amplitude $E_x$", 0.0, 1.0, 0.01, "E_x_amp")
+    st.slider(r"Amplitude $E_x$", 0.0, 1.0, step=0.01, key="E_x_amp")
     st.write(fr"$E_y=$ {np.sqrt(1.0 - st.session_state.E_x_amp ** 2):.3f}")
-
-    create_synced_input(r"Relative Phase $\varphi$ ($\times\pi$ rad)", 0.0, 2.0, 0.125, "phase_relative_pi")
+    st.slider(r"Relative Phase $\varphi$ ($\times\pi$ rad)", 0.0, 2.0, step=0.125, key="phase_relative_pi")
 
 with col2:
     if st.session_state.show_toggles or st.session_state.insert_wp:
         st.subheader("Wave Plate (WP)")
 
         if st.session_state.show_toggles:
-            wp_disabled = "insert_wp" in st.session_state.get("disable_keys", [])
-            st.checkbox("Insert Wave Plate", key="insert_wp", disabled=wp_disabled)
+            st.checkbox("Insert Wave Plate", key="insert_wp")
 
         if st.session_state.insert_wp:
-            create_synced_input(r"WP Fast Axis Angle $\Delta$ (Degrees)", 0.0, 180.0, 0.5, "wp_angle_deg")
-            create_synced_input(r"WP Retardance $\Gamma$ ($\times \pi$ rad)", 0.0, 2.0, 0.125, "retardance_pi")
+            st.slider(r"WP Fast Axis Angle $\Delta$ (Degrees)", 0.0, 180.0, step=0.5, key="wp_angle_deg")
+            st.slider(r"WP Retardance $\Gamma$ ($\times \pi$ rad)", 0.0, 2.0, step=0.125, key="retardance_pi")
         elif st.session_state.show_toggles:
             st.write("Removed. Vacuum propagation.")
 
@@ -403,11 +349,10 @@ with col3:
         st.subheader("Linear Polarizer")
 
         if st.session_state.show_toggles:
-            pol_disabled = "insert_pol" in st.session_state.get("disable_keys", [])
-            st.checkbox("Insert Polarizer", key="insert_pol", disabled=pol_disabled)
+            st.checkbox("Insert Polarizer", key="insert_pol")
 
         if st.session_state.insert_pol:
-            create_synced_input(r"Transmission Axis $\theta$ (Degrees)", 0.0, 180.0, 1.0, "pol_angle_deg")
+            st.slider(r"Transmission Axis $\theta$ (Degrees)", 0.0, 180.0, step=1.0, key="pol_angle_deg")
         elif st.session_state.show_toggles:
             st.write("Removed. Unobstructed beam.")
 
@@ -432,7 +377,7 @@ if st.session_state.show_poincare:
         fig = make_subplots(
             rows=1, cols=3,
             specs=[[{"type": "scene"}, {"type": "scene"}, {"type": "scene"}]],
-            column_widths=[0.3, 0.40, 0.3],
+            column_widths=[0.2, 0.60, 0.2],
             subplot_titles=(incident_title, spatial_title, transmitted_title),
         )
         sphere1_col = 1
@@ -442,8 +387,8 @@ if st.session_state.show_poincare:
         fig = make_subplots(
             rows=1, cols=2,
             specs=[[{"type": "scene"}, {"type": "scene"}]],
-            column_widths=[0.4, 0.6],
-            subplot_titles=("Polarization State", spatial_title),
+            column_widths=[0.2, 0.8],
+            subplot_titles=("Incident State", spatial_title),
         )
         sphere1_col = 1
         spatial_col = 2
@@ -483,11 +428,11 @@ def draw_optical_element(z_in, z_out, color, name, is_volume=True):
             row=1, col=spatial_col)
         fig.add_trace(go.Scatter3d(x=[z_in] * 5, y=transverse,
                                    z=[transverse[1], transverse[1], transverse[0], transverse[0], transverse[1]],
-                                   mode='lines', line=dict(color='lightblue', width=2), showlegend=False), row=1,
+                                   mode='lines', line=dict(color='gray', width=2), showlegend=False), row=1,
                       col=spatial_col)
         fig.add_trace(go.Scatter3d(x=[z_out] * 5, y=transverse,
                                    z=[transverse[1], transverse[1], transverse[0], transverse[0], transverse[1]],
-                                   mode='lines', line=dict(color='lightblue', width=2), showlegend=False), row=1,
+                                   mode='lines', line=dict(color='gray', width=2), showlegend=False), row=1,
                       col=spatial_col)
     else:
         x_vol = [z_in, z_in, z_in, z_in]
@@ -503,7 +448,7 @@ def draw_optical_element(z_in, z_out, color, name, is_volume=True):
 
 
 if st.session_state.insert_wp:
-    draw_optical_element(z_wp_in, z_wp_out, 'lightblue', 'Wave Plate', True)
+    draw_optical_element(z_wp_in, z_wp_out, 'white', 'Wave Plate', True)
     if st.session_state.show_axis:
         fa_x = [-1.5 * np.cos(wp_angle), 1.5 * np.cos(wp_angle)]
         fa_y = [-1.5 * np.sin(wp_angle), 1.5 * np.sin(wp_angle)]
@@ -566,45 +511,19 @@ if st.session_state.show_combined:
 if st.session_state.show_poincare:
     def add_poincare_sphere(fig, row, col, stokes_vec, name_prefix):
         u, v = np.mgrid[0:2 * np.pi:30j, 0:np.pi:15j]
-        # 1. Transparent Sphere Surface
         fig.add_trace(
             go.Surface(x=np.cos(u) * np.sin(v), y=np.sin(u) * np.sin(v), z=np.cos(v), colorscale='Greys', opacity=0.1,
                        showscale=False, hoverinfo='skip'), row=row, col=col)
 
-        # 2. Dotted Coordinate Axes
-        fig.add_trace(go.Scatter3d(
-            x=[-1.15, 1.15, None, 0, 0, None, 0, 0],
-            y=[0, 0, None, -1.15, 1.15, None, 0, 0],
-            z=[0, 0, None, 0, 0, None, -1.15, 1.15],
-            mode='lines',
-            line=dict(color='lightgray', width=2, dash='dot'),
-            hoverinfo='skip',
-            showlegend=False
-        ), row=row, col=col)
-
-        # 3. Arrowheads (Cones) for positive axes (JH, JD, JR)
-        cone_args = dict(
-            colorscale=[[0, 'lightgray'], [1, 'lightgray']], showscale=False,
-            sizemode="absolute", sizeref=0.1, anchor="tail", hoverinfo='skip', showlegend=False
-        )
-        # X-axis arrow (JH)
-        fig.add_trace(go.Cone(x=[1.15], y=[0], z=[0], u=[1], v=[0], w=[0], **cone_args), row=row, col=col)
-        # Y-axis arrow (JD)
-        fig.add_trace(go.Cone(x=[0], y=[1.15], z=[0], u=[0], v=[1], w=[0], **cone_args), row=row, col=col)
-        # Z-axis arrow (JR)
-        fig.add_trace(go.Cone(x=[0], y=[0], z=[1.15], u=[0], v=[0], w=[1], **cone_args), row=row, col=col)
-
-        # 4. Equator Line
         eq_t = np.linspace(0, 2 * np.pi, 100)
         fig.add_trace(go.Scatter3d(x=np.cos(eq_t), y=np.sin(eq_t), z=np.zeros_like(eq_t), mode='lines',
                                    line=dict(color='gray', width=2, dash='dot'), hoverinfo='skip', showlegend=False),
                       row=row, col=col)
 
-        ref_labels = ['<b>J</b><sub>H</sub> ↔', '<b>J</b><sub>V</sub> ↕', '<b>J</b><sub>D</sub> ⤢',
-                      '<b>J</b><sub>A</sub> ⤡', '<b>J</b><sub>R</sub> ↻', '<b>J</b><sub>L</sub> ↺']
+        ref_labels = ['H ↔', 'V ↕', 'D ⤢', 'A ⤡', 'R ↻', 'L ↺']
         ref_x, ref_y, ref_z = [1, -1, 0, 0, 0, 0], [0, 0, 1, -1, 0, 0], [0, 0, 0, 0, 1, -1]
         fig.add_trace(go.Scatter3d(x=ref_x, y=ref_y, z=ref_z, mode='markers+text', marker=dict(color='gray', size=3),
-                                   text=ref_labels, textposition='bottom center', textfont=dict(size=15),
+                                   text=ref_labels, textposition='bottom center', textfont=dict(size=13),
                                    hoverinfo='skip', showlegend=False), row=row, col=col)
 
         fig.add_trace(go.Scatter3d(x=[0, stokes_vec[0]], y=[0, stokes_vec[1]], z=[0, stokes_vec[2]], mode='lines',
@@ -663,24 +582,21 @@ if st.session_state.show_poincare:
                 arc_y = center[1] + radius * (np.cos(arc_t) * e1[1] + np.sin(arc_t) * e2[1])
                 arc_z = center[2] + radius * (np.cos(arc_t) * e1[2] + np.sin(arc_t) * e2[2])
 
-                fig.add_trace(
-                    go.Scatter3d(x=arc_x, y=arc_y, z=arc_z, mode='lines', line=dict(color='darkorange', width=4),
-                                 hoverinfo='skip', showlegend=False), row=1, col=sphere1_col)
+                fig.add_trace(go.Scatter3d(x=arc_x, y=arc_y, z=arc_z, mode='lines', line=dict(color='gold', width=4),
+                                           hoverinfo='skip', showlegend=False), row=1, col=sphere1_col)
 
                 u_dir = radius * (-np.sin(retardance) * e1[0] + np.cos(retardance) * e2[0])
                 v_dir = radius * (-np.sin(retardance) * e1[1] + np.cos(retardance) * e2[1])
                 w_dir = radius * (-np.sin(retardance) * e1[2] + np.cos(retardance) * e2[2])
                 fig.add_trace(go.Cone(x=[arc_x[-1]], y=[arc_y[-1]], z=[arc_z[-1]], u=[u_dir], v=[v_dir], w=[w_dir],
-                                      colorscale=[[0, 'darkorange'], [1, 'darkorange']], showscale=False,
-                                      sizemode="absolute",
+                                      colorscale=[[0, 'gold'], [1, 'gold']], showscale=False, sizemode="absolute",
                                       sizeref=0.1, anchor="tip", hoverinfo='skip', showlegend=False), row=1,
                               col=sphere1_col)
-            fig.add_trace(go.Scatter3d(x=[arc_x[-1]], y=[arc_y[-1]], z=[arc_z[-1]], mode='text',
-                                       text=[f"Γ = {st.session_state.retardance_pi:.2f}π"],
-                                       textposition='top right',
-                                       textfont=dict(color='darkorange', size=15), hoverinfo='skip',
-                                       showlegend=False),
-                          row=1, col=sphere1_col)
+                fig.add_trace(go.Scatter3d(x=[arc_x[-1]], y=[arc_y[-1]], z=[arc_z[-1]], mode='text',
+                                           text=[f"Γ = {st.session_state.retardance_pi:.2f}π"],
+                                           textposition='top right',
+                                           textfont=dict(color='gold', size=12), hoverinfo='skip', showlegend=False),
+                              row=1, col=sphere1_col)
 
         if st.session_state.insert_pol:
             fig.add_trace(go.Scatter3d(x=[0, S_pol_axis[0]], y=[0, S_pol_axis[1]], z=[0, S_pol_axis[2]], mode='lines',
@@ -689,7 +605,7 @@ if st.session_state.show_poincare:
             # Render ONLY the text label for the Polarizer on the Sphere (No Marker Dot)
             fig.add_trace(go.Scatter3d(x=[S_pol_axis[0]], y=[S_pol_axis[1]], z=[S_pol_axis[2]], mode='text',
                                        text=[f"Pol ({intensity_percent:.0f}%)<br>"],
-                                       textposition='top center', textfont=dict(size=15),
+                                       textposition='top center', textfont=dict(size=12),
                                        hoverinfo='skip',
                                        showlegend=False), row=1, col=sphere2_col)
             fig.add_trace(
@@ -727,7 +643,7 @@ scene_poincare_config = dict(
     yaxis=dict(title='', range=[-1.2, 1.2], showticklabels=False, showgrid=False, zeroline=False),
     zaxis=dict(title='', range=[-1.2, 1.2], showticklabels=False, showgrid=False, zeroline=False),
     aspectratio=dict(x=1, y=1, z=1),
-    camera=dict(eye=dict(x=1.5, y=1.5, z=1.5))
+    camera=dict(eye=dict(x=2.8, y=2.8, z=2.8))
 )
 
 for annotation in fig['layout']['annotations']:
@@ -767,6 +683,7 @@ st.plotly_chart(fig, use_container_width=True, config=plot_config)
 
 # --- 6. NAVIGATION, HINT, & EXPLANATION BOXES (BOTTOM) ---
 
+# Hint Box (Green)
 if st.session_state.show_hint and "hint" in step_data:
     processed_hint = process_math(step_data.get("hint", ""))
     st.markdown(
@@ -779,6 +696,7 @@ if st.session_state.show_hint and "hint" in step_data:
         unsafe_allow_html=True
     )
 
+# New Post-Completion Explanation Box (Light Blue)
 if target_met and "explanation" in step_data and step_data["explanation"]:
     processed_explanation = process_math(step_data.get("explanation", ""))
     st.markdown(
@@ -806,3 +724,8 @@ if not is_last_step:
     with col_btn_solve:
         if "solution" in step_data:
             st.button("✅ Show Solution", on_click=solve_challenge, use_container_width=True)
+
+# --- 7. POST-RENDER INITIALIZATION LOGGING ---
+if "logged_start" not in st.session_state:
+    log_action("Started Journey")
+    st.session_state.logged_start = True
