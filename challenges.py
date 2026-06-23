@@ -93,7 +93,7 @@ CHALLENGES = {
                 "explanation": r"To achieve 100% transmission through a linear polarizer, the light entering it must already perfectly match its transmission axis. Therefore, your wave plate must convert the Right-Circular light directly into Diagonal light. On the Poincaré sphere, this means rotating the state vector from the north pole down to the +45$^\circ$ diagonal point on the equator. Setting the fast axis to $\Delta = 90^\circ$ creates a rotation axis pointing to the vertical state. A quarter-wave retardance ($\Gamma = 0.5\pi$) rotates the pole exactly 90$^\circ$ to the diagonal state. Finally, turning the polarizer to $\theta = 45^\circ$ allows this diagonal light to pass through entirely without absorption. Note: A fast axis of $0^\circ$ and retardance of $1.5\pi$ is also a valid mathematical solution!"
             },
             {
-                "text": r"Done. Congratulations, you completed the tutorial. Feel free to play around with the applet! The code to proceed in the study is <b>horizontal light</b>. Please copy this code, go back to the survey, and enter to proceed.<br>",
+                "text": r"<b>Tutorial Completed!</b><br>Congratulations, you have finished the interactive physics module. Feel free to play around with the optical elements above. When you are ready to proceed with the study, click the return button at the bottom of the screen.<br>",
                 "task": r"",
                 "setup": {"insert_wp": True, "insert_pol": True, "show_toggles": True, "disable_keys": []},
                 "target": {}
@@ -186,9 +186,10 @@ CHALLENGES = {
                 "explanation": r"To achieve 100% transmission through a linear polarizer, the light entering it must already perfectly match its transmission axis. Therefore, your wave plate must convert the Right-Circular light directly into Diagonal light. Mathematically, a quarter-wave plate ($\Gamma = 0.5\pi$) with its fast axis vertical ($\Delta = 90^\circ$) delays the horizontal component relative to the vertical one, canceling out the initial phase shift of the circular light and bringing both components perfectly in-phase. This yields a linear diagonal wave. Finally, turning the polarizer to $\theta = 45^\circ$ matches this wave, allowing it to pass through entirely without absorption. Note: A fast axis of $0^\circ$ and retardance of $1.5\pi$ is also a valid mathematical solution!"
             },
             {
-                "text": r"Done. Congratulations, you completed the tutorial. Feel free to play around with the applet! The code to proceed in the study is <b>vertical light</b>. Please copy this code, go back to the survey, and enter to proceed.<br>",
+                "text": r"<b>Tutorial Completed!</b><br>Congratulations, you have finished the interactive physics module. Feel free to play around with the optical elements above. When you are ready to proceed with the study, click the return button at the bottom of the screen.<br>",
                 "task": r"",
-                "setup": {"insert_wp": True, "insert_pol": True, "show_toggles": True, "show_poincare": False, "disable_keys": []},
+                "setup": {"insert_wp": True, "insert_pol": True, "show_toggles": True, "show_poincare": False,
+                          "disable_keys": []},
                 "target": {}
             }
         ]

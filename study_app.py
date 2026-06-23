@@ -60,6 +60,13 @@ if st.session_state.show_landing:
 
 # --- 1. SESSION STATE, COHORT ASSIGNMENT & LOGGING ENGINE ---
 
+# Capture the Participant ID from the URL right away
+if "participant_id" not in st.session_state:
+    if "pid" in st.query_params:
+        st.session_state.participant_id = st.query_params["pid"]
+    else:
+        st.session_state.participant_id = "UNKNOWN_ID"
+
 # Randomly assign participant to a specific journey on their first load
 if "assigned_journey" not in st.session_state:
     st.session_state.assigned_journey = "Polarization 1"
@@ -791,7 +798,25 @@ if target_met and "explanation" in step_data and step_data["explanation"]:
         unsafe_allow_html=True
     )
 
-if not is_last_step:
+# --- NEW ROUTING BUTTON LOGIC ---
+if is_last_step and st.session_state.current_challenge != "Free Play":
+    st.divider()
+    st.markdown("### 🎓 Unit Complete")
+    st.markdown(
+        "Congratulations! You have finished the interactive module. You can continue to freely play with the optical elements above, or click the button below to return to the survey and finish the study.")
+
+    # Construct the Return URL for Survey B
+    # IMPORTANT: Replace these with your actual LimeSurvey domain and Survey B ID
+    limesurvey_domain = "https://your-university-domain.limesurvey.net"
+    survey_b_id = "123456"
+    pid = st.session_state.participant_id
+
+    return_url = f"{limesurvey_domain}/index.php/{survey_b_id}?pid={pid}"
+
+    # Render the routing button
+    st.link_button("🚀 Return to Post-Test Survey", return_url, type="primary", use_container_width=True)
+
+elif not is_last_step:
     st.markdown("<br>", unsafe_allow_html=True)
     col_btn_hint, col_btn_next, _spacer, col_btn_solve = st.columns([1.5, 1.5, 5.5, 1.5])
 
