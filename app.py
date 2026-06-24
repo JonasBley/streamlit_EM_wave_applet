@@ -67,11 +67,17 @@ if "participant_id" not in st.session_state:
     else:
         st.session_state.participant_id = "UNKNOWN_ID"
 
-# NEW: Randomly assign cohort to Polarization 1 (with Poincare) or Polarization 2 (without)
+# NEW: Capture whether this participant is running with Eye-Tracking (1) or without (0)
+if "et_status" not in st.session_state:
+    if "et" in st.query_params:
+        st.session_state.et_status = st.query_params["et"]
+    else:
+        st.session_state.et_status = "0"  # Default to 0 if missing
+
+# Randomly assign cohort to Polarization 1 or Polarization 2
 if "assigned_journey" not in st.session_state:
     st.session_state.assigned_journey = random.choice(["Polarization 1", "Polarization 2"])
 
-# Ensure current_challenge stays pinned to the assigned journey
 if "current_challenge" not in st.session_state:
     st.session_state.current_challenge = st.session_state.assigned_journey
 
@@ -802,25 +808,24 @@ if target_met and "explanation" in step_data and step_data["explanation"]:
         unsafe_allow_html=True
     )
 
-# --- NEW ROUTING BUTTON LOGIC ---
-# --- NEW ROUTING BUTTON LOGIC ---
+# --- ROUTING BUTTON LOGIC ---
 if is_last_step and st.session_state.current_challenge != "Free Play":
     st.divider()
     st.markdown("### 🎓 Unit Complete")
-    st.markdown("Paragraph introducing the transition back...")
+    st.markdown("Please click the button below to return to the survey and complete the final questions.")
 
-    # Construct the Return URL for Survey B with BOTH parameters
+    # Construct the Return URL for Survey B with ALL three parameters
     limesurvey_domain = "https://your-university-domain.limesurvey.net"
     survey_b_id = "123456"
     pid = st.session_state.participant_id
-    journey = st.session_state.assigned_journey  # Will be "Polarization 1" or "Polarization 2"
+    journey = st.session_state.assigned_journey
+    et = st.session_state.et_status  # Will pass "1" or "0" forward
 
-    # Appending both variables using an ampersand (&)
-    return_url = f"{limesurvey_domain}/index.php/{survey_b_id}?pid={pid}&journey={journey}"
+    # Securely concatenating all variables using proper URL syntax
+    return_url = f"{limesurvey_domain}/index.php/{survey_b_id}?pid={pid}&journey={journey}&et={et}"
 
     # Render the routing button
     st.link_button("🚀 Return to Post-Test Survey", return_url, type="primary", use_container_width=True)
-
     
 elif not is_last_step:
     st.markdown("<br>", unsafe_allow_html=True)
