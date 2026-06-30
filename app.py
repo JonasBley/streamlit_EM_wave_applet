@@ -21,7 +21,7 @@ if st.session_state.show_landing:
     st.title("Welcome to the Interactive Polarization Study")
 
     st.markdown("""
-    Thank you for participating in this study! In this module, you will interactively explore the physics of light polarization. 
+    Thank you for participating in this study! In this module, you will interactively explore the physics of light polarization. During the study, please do not use any external tools including pen and paper.
 
     Before we begin, please read how the interface works:
     """)
@@ -564,21 +564,21 @@ if st.session_state.insert_pol:
         fig.add_trace(go.Scatter3d(x=[z_pol, z_pol], y=[0, 1.5], z=[0, 0], mode='lines',
                                    line=dict(color='gray', dash='dot', width=2), hoverinfo='skip', showlegend=False),
                       row=1, col=spatial_col)
-        if pol_angle > 0.01:
-            arc_t = np.linspace(0, pol_angle, 20)
-            arc_r = 0.6
-            fig.add_trace(go.Scatter3d(x=[z_pol] * 20, y=arc_r * np.cos(arc_t), z=arc_r * np.sin(arc_t), mode='lines',
-                                       line=dict(color='cyan', width=2), hoverinfo='skip', showlegend=False), row=1,
-                          col=spatial_col)
-            fig.add_trace(go.Scatter3d(x=[z_pol], y=[(arc_r + 0.2) * np.cos(pol_angle / 2)],
-                                       z=[(arc_r + 0.2) * np.sin(pol_angle / 2)],
-                                       mode='text', text=['θ'], textfont=dict(color='cyan', size=15), hoverinfo='skip',
-                                       showlegend=False), row=1, col=spatial_col)
+
+        arc_t = np.linspace(0, pol_angle, 20)
+        arc_r = 0.6
+        fig.add_trace(go.Scatter3d(x=[z_pol] * 20, y=arc_r * np.cos(arc_t), z=arc_r * np.sin(arc_t), mode='lines',
+                                   line=dict(color='cyan', width=2), hoverinfo='skip', showlegend=False), row=1,
+                      col=spatial_col)
+        fig.add_trace(go.Scatter3d(x=[z_pol], y=[(arc_r + 0.2) * np.cos(pol_angle / 2)],
+                                   z=[(arc_r + 0.2) * np.sin(pol_angle / 2)],
+                                   mode='text', text=['θ'], textfont=dict(color='cyan', size=15), hoverinfo='skip',
+                                   showlegend=False), row=1, col=spatial_col)
 
 if st.session_state.show_combined:
     z_final = z_pol if st.session_state.insert_pol else z_wp_out
     fig.add_trace(go.Scatter3d(x=[z_end] * len(z[z >= z_final]), y=Ex[z >= z_final], z=Ey[z >= z_final], mode='lines',
-                               line=dict(color='magenta', width=3), name='Final Polarization'), row=1, col=spatial_col)
+                               line=dict(color='magenta', width=3), name='Projection on the E_<sub>x</sub>-E_<sub>y</sub>-plane'), row=1, col=spatial_col)
 
 if st.session_state.show_poincare:
     def add_poincare_sphere(fig, row, col, stokes_vec, name_prefix):
@@ -621,7 +621,7 @@ if st.session_state.show_poincare:
                       '<b>J</b><sub>A</sub> ⤡', '<b>J</b><sub>R</sub> ↻', '<b>J</b><sub>L</sub> ↺']
         ref_x, ref_y, ref_z = [1, -1, 0, 0, 0, 0], [0, 0, 1, -1, 0, 0], [0, 0, 0, 0, 1, -1]
         fig.add_trace(go.Scatter3d(x=ref_x, y=ref_y, z=ref_z, mode='markers+text', marker=dict(color='gray', size=3),
-                                   text=ref_labels, textposition='bottom center', textfont=dict(size=15),
+                                   text=ref_labels, textposition='bottom center', textfont=dict(size=18),
                                    hoverinfo='skip', showlegend=False), row=row, col=col)
 
         fig.add_trace(go.Scatter3d(x=[0, stokes_vec[0]], y=[0, stokes_vec[1]], z=[0, stokes_vec[2]], mode='lines',
