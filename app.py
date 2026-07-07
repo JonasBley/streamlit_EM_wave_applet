@@ -753,6 +753,7 @@ for annotation in fig['layout']['annotations']:
 layout_args = dict(
     height=700 if st.session_state.show_poincare else 500,
     margin=dict(l=10, r=10, b=10, t=40),
+    uirevision="constant_camera_state"  # Instructs the frontend to persist manual camera rotations across reruns
 )
 
 if st.session_state.show_poincare:
