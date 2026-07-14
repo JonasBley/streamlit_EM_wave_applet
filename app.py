@@ -21,7 +21,7 @@ if st.session_state.show_landing:
     st.title("Welcome to this Interactive Polarization Applet")
 
     st.markdown("""
-    Thank you for participating in this study! In this module, you will interactively explore the physics of light polarization. During the study, please do not use any external tools including pen and paper.
+    Thank you for participating in this study! In this module, you will interactively explore the physics of light polarization.
 
     Before we begin, please read how the interface works:
     """)
