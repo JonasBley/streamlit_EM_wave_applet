@@ -775,7 +775,7 @@ if is_last_step and st.session_state.current_challenge != "Free Play":
     journey = st.session_state.assigned_journey
     et = st.session_state.et_status
 
-    return_url = f"{limesurvey_domain}/index.php/{survey_b_id}?pid={pid}&journey={journey}&et={et}"
+    return_url = f"{limesurvey_domain}/index.php/{survey_b_id}?journey={journey}"
 
     st.link_button("🚀 Return to Post-Test Survey", return_url, type="primary", use_container_width=True)
 
