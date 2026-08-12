@@ -769,8 +769,8 @@ if is_last_step and st.session_state.current_challenge != "Free Play":
     st.markdown("### 🎓 Unit Complete")
     st.markdown("Please click the button below to return to the survey and complete the final questions.")
 
-    limesurvey_domain = "https://your-university-domain.limesurvey.net"
-    survey_b_id = "123456"
+    limesurvey_domain = "https://umfrage.uni-leipzig.de/"
+    survey_b_id = "658185"
     pid = st.session_state.participant_id
     journey = st.session_state.assigned_journey
     et = st.session_state.et_status
