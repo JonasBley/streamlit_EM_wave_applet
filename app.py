@@ -76,7 +76,7 @@ if "et_status" not in st.session_state:
 
 # Randomly assign cohort to Polarization 1 or Polarization 2
 if "assigned_journey" not in st.session_state:
-    st.session_state.assigned_journey = random.choice(["Polarization_1", "Polarization_2"])
+    st.session_state.assigned_journey = random.choice(["Polarization 1", "Polarization 2"])
 
 if "current_challenge" not in st.session_state:
     st.session_state.current_challenge = st.session_state.assigned_journey
