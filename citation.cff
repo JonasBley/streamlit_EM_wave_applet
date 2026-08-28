@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Bley"
+  given-names: "Jonas"
+  orcid: "https://orcid.org/0000-0001-6213-1303"
+title: "Polarization of Light Applet"
+version: 1.0.0
+date-released: 2026-08-28
+url: "https://github.com/JonasBley/streamlit_EM_wave_applet"
