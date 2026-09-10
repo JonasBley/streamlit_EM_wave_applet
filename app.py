@@ -96,6 +96,11 @@ html, body { margin: 0; padding: 0; overflow: hidden; }
         layout.plot_bgcolor = background;
         layout.font = {...layout.font, color: foreground};
         if (theme.font) layout.font.family = theme.font;
+        for (const trace of figure.data || []) {
+            if (trace.meta?.role === "jones_reference_labels") {
+                trace.textfont = {...trace.textfont, color: foreground};
+            }
+        }
         layout.legend = {...layout.legend, bgcolor: background,
             font: {...layout.legend?.font, color: foreground}};
         layout.hoverlabel = {...layout.hoverlabel, bgcolor: surface,
@@ -765,9 +770,11 @@ if st.session_state.show_poincare:
 
         ref_labels = ['<b>J</b><sub>H</sub> ↔', '<b>J</b><sub>V</sub> ↕', '<b>J</b><sub>D</sub> ⤢',
                       '<b>J</b><sub>A</sub> ⤡', '<b>J</b><sub>R</sub> ↻', '<b>J</b><sub>L</sub> ↺']
-        ref_x, ref_y, ref_z = [1.25, -1.25, 0, 0, 0, 0], [0, 0, 1.25, -1.25, 0, 0], [0, 0, 0, 0, 1.25, -1.25]
-        fig.add_trace(go.Scatter3d(x=ref_x, y=ref_y, z=ref_z, mode='markers+text', marker=dict(color='gray', size=1),
-                                   text=ref_labels, textposition='middle center', textfont=dict(size=14),
+        # Keep the reference states on the sphere, inside the scene's ±1.2 limits.
+        ref_x, ref_y, ref_z = [1, -1, 0, 0, 0, 0], [0, 0, 1, -1, 0, 0], [0, 0, 0, 0, 1, -1]
+        fig.add_trace(go.Scatter3d(x=ref_x, y=ref_y, z=ref_z, mode='markers+text', marker=dict(color='gray', size=3),
+                                   text=ref_labels, textposition='bottom center', textfont=dict(size=18),
+                                   meta=dict(role='jones_reference_labels'),
                                    hoverinfo='skip', showlegend=False), row=row, col=col)
 
         fig.add_trace(go.Scatter3d(x=[0, stokes_vec[0]], y=[0, stokes_vec[1]], z=[0, stokes_vec[2]], mode='lines',
