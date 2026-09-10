@@ -3,9 +3,10 @@ name = "streamlit-em-wave-applet"
 version = "0.1.0"
 requires-python = ">=3.13"
 dependencies = [
-    "latex2mathml>=3.81.0",
-    "numpy>=2.4.6",
-    "pandas-stubs~=3.0.3",
-    "plotly>=6.7.0",
-    "streamlit>=1.57.0",
+    "streamlit~=1.57.0",
+    "numpy~=2.4.6",
+    "plotly~=6.7.0",
+    "latex2mathml~=3.81.0",
+    "gspread~=6.0.0",
+    "google-auth~=2.27.0",
 ]

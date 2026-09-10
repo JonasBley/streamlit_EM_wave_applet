@@ -132,7 +132,7 @@ CHALLENGES = {
             {
                 "text": r"<b>Step 4 of 9: Wave Plates (Retarders)</b><br>A wave plate has different refractive indices along two axes, called the fast and slow axes, and orthogonally decomposes light to introduce a phase delay $\Gamma$ between these two axes. If the fast axis angle is at $0^\circ$ (horizontal), within the Jones formalism it can be described with the matrix $\mathbf{M}(\Gamma) = \begin{pmatrix} 1 & 0 \\ 0 & e^{i\Gamma} \end{pmatrix}.$ The retardance $\Gamma$ is directly proportional to the physical thickness of the wave plate. It only changes the relative phase of a Jones vector $\begin{pmatrix} E_x \\ E_y e^{i\varphi} \end{pmatrix}$:<br><br> $\begin{pmatrix} 1 & 0 \\ 0 & e^{i\Gamma} \end{pmatrix}\begin{pmatrix} E_x \\ E_y e^{i\varphi} \end{pmatrix}=\begin{pmatrix} E_x \\ E_y e^{i(\varphi+\Gamma)} \end{pmatrix}.$<br><br> We have inserted a wave plate (WP) into the beam path.",
                 "task": r"Starting with a diagonal incident wave ($E_x = E_y = \frac{1}{\sqrt{2}}$), find the retardance $\Gamma$ necessary to output a left-circularly polarized state.",
-                "hint": r"To rotate a diagonal vector to a left-circular one, the wave component $E_y$ needs to be shifted by more than $\pi$.",
+                "hint": r"To rotate a diagonal vector to a left-circular one, the relative phase needs to be shifted by more than $\pi$.",
                 "setup": {"insert_wp": True, "E_x_amp": 0.71, "phase_relative_pi": 0.0, "wp_angle_deg": 0.0, "retardance_pi": 0.0, "show_toggles": False, "show_poincare": False, "disable_keys": ["E_x_amp", "phase_relative_pi", "wp_angle_deg"]},
                 "target": {"E_x_amp": 0.71, "retardance_pi": 1.5},
                 "solution": {"retardance_pi": 1.5},

@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -12,6 +13,185 @@ from challenges import CHALLENGES
 from latex2mathml.converter import convert as latex_to_mathml
 
 st.set_page_config(page_title="Interactive Polarization Challenges", layout="wide")
+
+scroll_slot = st.empty()
+
+# A keyed custom component retains its iframe when its figure arguments change.
+# Keep Plotly's graph and camera state in that iframe, rather than recreating
+# a native st.plotly_chart whose ID includes the changing figure JSON.
+@st.cache_resource
+def _camera_component_directory():
+    from pathlib import Path
+    import tempfile
+    from plotly.offline import get_plotlyjs
+
+    directory = Path(tempfile.mkdtemp(prefix="polarization_plotly_"))
+    # Serve the JS bundled with the installed Plotly; no CDN is required.
+    (directory / "plotly.min.js").write_text(get_plotlyjs(), encoding="utf-8")
+    (directory / "index.html").write_text(r'''<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+html, body { margin: 0; padding: 0; overflow: hidden; }
+#chart { width: 100%; }
+#error { color: #b00020; font: 14px sans-serif; white-space: pre-wrap; }
+</style>
+<script src="plotly.min.js"></script>
+</head><body><div id="chart"></div><div id="error" role="alert"></div>
+<script>
+(() => {
+    const chart = document.getElementById("chart");
+    const errorBox = document.getElementById("error");
+    const clone = value => JSON.parse(JSON.stringify(value));
+    let revision = null;
+    let roles = {};
+    let cameras = {};
+    let initialized = false;
+    let rendering = false;
+    let pending = null;
+    let busy = false;
+
+    function send(type, payload = {}) {
+        window.parent.postMessage({isStreamlitMessage: true, type, ...payload}, "*");
+    }
+
+    function rememberCamera(event) {
+        if (rendering) return;
+        for (const [scene, role] of Object.entries(roles)) {
+            const prefix = scene + ".camera";
+            if (event[prefix]) cameras[role] = clone(event[prefix]);
+            // Also accept Plotly's flattened relayout updates.
+            for (const [key, value] of Object.entries(event)) {
+                if (!key.startsWith(prefix + ".")) continue;
+                const path = key.slice(prefix.length + 1).split(".");
+                if (!path.every(part => /^(eye|center|up|projection|x|y|z|type)$/.test(part))) continue;
+                let target = cameras[role] ||= {};
+                for (const part of path.slice(0, -1)) target = target[part] ||= {};
+                target[path[path.length - 1]] = clone(value);
+            }
+        }
+    }
+
+    async function render(args) {
+        const figure = JSON.parse(args.figure_json);
+        // Streamlit sends its resolved theme separately from component args.
+        // This includes the OS preference when the app follows system settings.
+        const theme = args.streamlit_theme || {};
+        const dark = theme.base === "dark" || (!theme.base &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches);
+        const background = theme.backgroundColor || (dark ? "#0e1117" : "#ffffff");
+        const surface = theme.secondaryBackgroundColor || (dark ? "#262730" : "#f0f2f6");
+        const foreground = theme.textColor || (dark ? "#fafafa" : "#31333f");
+        const grid = dark ? "#454852" : "#d6d9df";
+        document.body.style.backgroundColor = background;
+        document.body.style.color = foreground;
+        document.documentElement.style.colorScheme = dark ? "dark" : "light";
+        errorBox.style.color = dark ? "#ff9b9b" : "#b00020";
+        if (revision !== args.revision) {
+            revision = args.revision;
+            cameras = {}; // Deliberately reset on a new tutorial step.
+        }
+        roles = args.scene_roles;
+        const layout = figure.layout || {};
+        layout.paper_bgcolor = background;
+        layout.plot_bgcolor = background;
+        layout.font = {...layout.font, color: foreground};
+        if (theme.font) layout.font.family = theme.font;
+        layout.legend = {...layout.legend, bgcolor: background,
+            font: {...layout.legend?.font, color: foreground}};
+        layout.hoverlabel = {...layout.hoverlabel, bgcolor: surface,
+            font: {...layout.hoverlabel?.font, color: foreground}};
+        layout.modebar = {...layout.modebar, bgcolor: background,
+            color: foreground, activecolor: theme.primaryColor || foreground};
+        for (const annotation of layout.annotations || []) {
+            annotation.font = {...annotation.font, color: foreground};
+        }
+        layout.autosize = true;
+        delete layout.width;
+        layout.height = args.height;
+        layout.uirevision = revision;
+        for (const [scene, role] of Object.entries(roles)) {
+            layout[scene] ||= {};
+            layout[scene].bgcolor = background;
+            for (const name of ["xaxis", "yaxis", "zaxis"]) {
+                const axis = layout[scene][name] ||= {};
+                Object.assign(axis, {color: foreground, backgroundcolor: surface,
+                    gridcolor: grid, zerolinecolor: grid, linecolor: grid});
+                axis.tickfont = {...axis.tickfont, color: foreground};
+                if (axis.title && typeof axis.title === "object") {
+                    axis.title.font = {...axis.title.font, color: foreground};
+                }
+            }
+            // A scene number can change meaning when spheres are toggled.
+            layout[scene].uirevision = revision + ":" + role;
+            if (cameras[role]) layout[scene].camera = clone(cameras[role]);
+            else if (layout[scene].camera) cameras[role] = clone(layout[scene].camera);
+        }
+        chart.style.height = args.height + "px";
+        send("streamlit:setFrameHeight", {height: args.height});
+        rendering = true;
+        try {
+            await Plotly.react(chart, figure.data, layout, {...args.config, responsive: true});
+            if (!initialized) {
+                chart.on("plotly_relayout", rememberCamera);
+                initialized = true;
+            }
+            errorBox.textContent = "";
+        } finally {
+            rendering = false;
+        }
+    }
+
+    async function drain() {
+        if (busy) return;
+        busy = true;
+        try {
+            while (pending) {
+                const args = pending;
+                pending = null;
+                try { await render(args); }
+                catch (error) {
+                    errorBox.textContent = "Chart rendering failed: " + error.message;
+                    send("streamlit:setFrameHeight", {height: args.height + 60});
+                    console.error(error);
+                }
+            }
+        } finally { busy = false; }
+    }
+
+    window.addEventListener("message", event => {
+        if (event.source !== window.parent || event.data?.type !== "streamlit:render") return;
+        pending = {...event.data.args, streamlit_theme: event.data.theme};
+        void drain();
+    });
+    let resizeFrame;
+    new ResizeObserver(() => {
+        cancelAnimationFrame(resizeFrame);
+        resizeFrame = requestAnimationFrame(() => {
+            if (initialized && !rendering) Plotly.Plots.resize(chart);
+        });
+    }).observe(document.body);
+    send("streamlit:componentReady", {apiVersion: 1});
+})();
+</script></body></html>''', encoding="utf-8")
+    return str(directory)
+
+
+def show_camera_preserving_plot(fig, config, scene_roles, revision):
+    component = components.declare_component(
+        "polarization_camera_plot",
+        path=_camera_component_directory(),
+    )
+    component(
+        figure_json=fig.to_json(),
+        config=config,
+        scene_roles=scene_roles,
+        revision=revision,
+        height=int(fig.layout.height or 700),
+        key="polarization_visualization",
+        default=None,
+    )
+
+
 
 # --- 0. LANDING PAGE GATEKEEPER ---
 if "show_landing" not in st.session_state:
@@ -129,6 +309,7 @@ def next_step():
     log_action("Clicked Next Step")
     st.session_state.current_step += 1
     st.session_state.show_hint = False
+    st.session_state.scroll_to_top = True  # Triggers the JS auto-scroll on the next render
     load_step_setup(st.session_state.current_challenge, st.session_state.current_step)
 
 
@@ -281,6 +462,10 @@ def check_target_met(target_dict, derived):
 
 
 # --- 3. UI: HEADER AND TUTORIAL BOX ---
+st.markdown(
+    '<div id="polarization-page-top"></div>',
+    unsafe_allow_html=True,
+)
 st.title("Polarization of Light")
 st.caption(f"Active Module: {st.session_state.assigned_journey}")
 
@@ -692,9 +877,11 @@ if st.session_state.show_poincare:
 
 # --- Global Layout Formatting ---
 
-# CAMERA GATEKEEPER: Only send the default camera dict when initializing a brand new step!
-current_step_id = f"step_{st.session_state.current_step}"
-camera_init_key = f"camera_init_{current_step_id}"
+# Change the revision only when cameras should reset (on a new step).
+current_step_id = (
+    f"{st.session_state.current_challenge}:"
+    f"{st.session_state.current_step}"
+)
 
 scene_spatial_config = dict(
     xaxis=dict(title='Propagation (z)', range=[z_start, z_end]),
@@ -712,11 +899,14 @@ scene_poincare_config = dict(
     uirevision=current_step_id
 )
 
-# Apply default camera ONLY on the first render of a new step.
-if camera_init_key not in st.session_state:
-    st.session_state[camera_init_key] = True
-    scene_spatial_config['camera'] = dict(eye=dict(x=1.2, y=-3.8, z=1.2))
-    scene_poincare_config['camera'] = dict(eye=dict(x=1.5, y=1.5, z=1.5))
+# Stable default cameras; the component restores user cameras within each step.
+
+scene_spatial_config["camera"] = dict(
+    eye=dict(x=1.2, y=-3.8, z=1.2)
+)
+scene_poincare_config["camera"] = dict(
+    eye=dict(x=1.5, y=1.5, z=1.5)
+)
 
 for annotation in fig['layout']['annotations']:
     annotation['yshift'] = -100
@@ -747,7 +937,15 @@ plot_config = {
     'displaylogo': False
 }
 
-st.plotly_chart(fig, use_container_width=True, config=plot_config)
+# Store cameras by physical role, even if subplot numbering changes.
+if st.session_state.show_poincare:
+    scene_roles = {"scene": "incident", "scene2": "spatial"}
+    if has_two_spheres:
+        scene_roles["scene3"] = "transmitted"
+else:
+    scene_roles = {"scene": "spatial"}
+
+show_camera_preserving_plot(fig, plot_config, scene_roles, current_step_id)
 
 # --- 6. NAVIGATION, HINT, & EXPLANATION BOXES (BOTTOM) ---
 
@@ -794,3 +992,73 @@ elif not is_last_step:
     with col_btn_solve:
         if "solution" in step_data:
             st.button("✅ Show Solution", on_click=solve_challenge, use_container_width=True)
+
+
+if st.session_state.pop("scroll_to_top", False):
+    # Different HTML for every navigation, so the script runs again.
+    scroll_token = uuid.uuid4().hex
+
+    with scroll_slot:
+        components.html(
+            """
+            <script>
+            // Navigation token: __TOKEN__
+
+            (() => {
+                let doc;
+
+                try {
+                    doc = window.parent.document;
+                } catch (error) {
+                    console.warn(
+                        "Cannot access the Streamlit page for scrolling.",
+                        error
+                    );
+                    return;
+                }
+
+                function scrollToTop() {
+                    const anchor = doc.getElementById(
+                        "polarization-page-top"
+                    );
+                    if (!anchor) return;
+
+                    // Find the actual scrolling ancestors instead of
+                    // depending on Streamlit's internal CSS selectors.
+                    let element = anchor.parentElement;
+
+                    while (element) {
+                        const style = doc.defaultView.getComputedStyle(element);
+
+                        if (
+                            /(auto|scroll|overlay)/.test(style.overflowY) &&
+                            element.scrollHeight > element.clientHeight
+                        ) {
+                            element.scrollTo({
+                                top: 0,
+                                behavior: "instant"
+                            });
+                        }
+
+                        element = element.parentElement;
+                    }
+
+                    doc.scrollingElement?.scrollTo({
+                        top: 0,
+                        behavior: "instant"
+                    });
+                }
+
+                // Allow the rerender and browser layout to settle.
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(scrollToTop);
+                });
+
+                [150, 400, 800].forEach(delay => {
+                    setTimeout(scrollToTop, delay);
+                });
+            })();
+            </script>
+            """.replace("__TOKEN__", scroll_token),
+            height=0,
+        )
