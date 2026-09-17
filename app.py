@@ -849,7 +849,7 @@ if st.session_state.show_poincare:
                         showscale=False, sizemode="absolute", sizeref=0.1, anchor="tip", hoverinfo='skip',
                         showlegend=False), row=1, col=sphere1_col)
             fig.add_trace(go.Scatter3d(x=t_x, y=t_y, z=t_z, mode='text', text=t_v, textposition='top right',
-                                       textfont=dict(color='darkorange', size=15), hoverinfo='skip', showlegend=False),
+                                       textfont=dict(color='darkorange', size=24), hoverinfo='skip', showlegend=False),
                           row=1, col=sphere1_col)
 
         if st.session_state.insert_pol:
