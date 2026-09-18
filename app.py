@@ -592,6 +592,9 @@ with col4:
         st.checkbox("Show Poincaré Sphere(s)", key="show_poincare")
 
 # --- 5. VISUALIZATION ---
+# Shared size for Jones reference labels and wave-plate angle labels.
+STATE_LABEL_SIZE = 24
+
 spatial_title = f"Spatial Propagation"
 has_two_spheres = st.session_state.insert_wp or st.session_state.insert_pol
 
@@ -702,7 +705,7 @@ if st.session_state.insert_wp:
         go.Scatter3d(x=arc_x, y=arc_y, z=arc_z, mode='lines', line=dict(color='orange', width=2), hoverinfo='skip',
                      showlegend=False), row=1, col=spatial_col)
     fig.add_trace(
-        go.Scatter3d(x=txt_x, y=txt_y, z=txt_z, mode='text', text=txt_v, textfont=dict(color='orange', size=15),
+        go.Scatter3d(x=txt_x, y=txt_y, z=txt_z, mode='text', text=txt_v, textfont=dict(color='orange', size=STATE_LABEL_SIZE),
                      hoverinfo='skip', showlegend=False), row=1, col=spatial_col)
 
 if st.session_state.insert_pol:
@@ -746,8 +749,43 @@ fig.add_trace(
     go.Scatter3d(x=comb_x_proj, y=comb_y_proj, z=comb_z_proj, mode='lines', line=dict(color='magenta', width=3),
                  name='Projection'), row=1, col=spatial_col)
 
+def add_state_arrow(fig, row, col, stokes_vec, color, name, visible=True):
+    """Draw a Stokes-state shaft and cone; retain empty traces when hidden."""
+    vector = np.asarray(stokes_vec, dtype=float)
+    norm = np.linalg.norm(vector)
+    visible = visible and np.isfinite(vector).all() and norm > 1e-10
+
+    if visible:
+        x, y, z = vector
+        ux, uy, uz = vector / norm
+        shaft = dict(x=[0, x], y=[0, y], z=[0, z])
+        tip = dict(x=[x], y=[y], z=[z], u=[ux], v=[uy], w=[uz])
+    else:
+        shaft = dict(x=[None], y=[None], z=[None])
+        tip = dict(
+            x=[None], y=[None], z=[None],
+            u=[None], v=[None], w=[None],
+        )
+
+    fig.add_trace(
+        go.Scatter3d(
+            **shaft, mode="lines", line=dict(color=color, width=5),
+            name=name, hoverinfo="skip", showlegend=False,
+        ),
+        row=row, col=col,
+    )
+    fig.add_trace(
+        go.Cone(
+            **tip, colorscale=[[0, color], [1, color]], showscale=False,
+            sizemode="absolute", sizeref=0.15, anchor="tip",
+            name=name, hoverinfo="skip", showlegend=False,
+        ),
+        row=row, col=col,
+    )
+
+
 if st.session_state.show_poincare:
-    def add_poincare_sphere(fig, row, col, stokes_vec, name_prefix):
+    def add_poincare_sphere(fig, row, col, stokes_vec, name_prefix, state_color="green"):
         u, v = np.mgrid[0:2 * np.pi:30j, 0:np.pi:15j]
         fig.add_trace(
             go.Surface(x=np.cos(u) * np.sin(v), y=np.sin(u) * np.sin(v), z=np.cos(v), colorscale='Greys', opacity=0.1,
@@ -773,29 +811,24 @@ if st.session_state.show_poincare:
         # Keep the reference states on the sphere, inside the scene's ±1.2 limits.
         ref_x, ref_y, ref_z = [1, -1, 0, 0, 0, 0], [0, 0, 1, -1, 0, 0], [0, 0, 0, 0, 1, -1]
         fig.add_trace(go.Scatter3d(x=ref_x, y=ref_y, z=ref_z, mode='markers+text', marker=dict(color='gray', size=3),
-                                   text=ref_labels, textposition='bottom center', textfont=dict(size=18),
+                                   text=ref_labels, textposition='bottom center', textfont=dict(size=STATE_LABEL_SIZE),
                                    meta=dict(role='jones_reference_labels'),
                                    hoverinfo='skip', showlegend=False), row=row, col=col)
 
-        fig.add_trace(go.Scatter3d(x=[0, stokes_vec[0]], y=[0, stokes_vec[1]], z=[0, stokes_vec[2]], mode='lines',
-                                   line=dict(color='green', width=4), hoverinfo='skip', showlegend=False), row=row,
-                      col=col)
-
-        stokes_norm = np.linalg.norm(stokes_vec)
-        c_x, c_y, c_z, c_u, c_v, c_w = ([stokes_vec[0]], [stokes_vec[1]], [stokes_vec[2]],
-                                        [stokes_vec[0] / stokes_norm], [stokes_vec[1] / stokes_norm],
-                                        [stokes_vec[2] / stokes_norm]) if stokes_norm > 1e-4 else ([None], [None],
-                                                                                                   [None], [None],
-                                                                                                   [None], [None])
-        fig.add_trace(
-            go.Cone(x=c_x, y=c_y, z=c_z, u=c_u, v=c_v, w=c_w, colorscale=[[0, 'green'], [1, 'green']], showscale=False,
-                    sizemode="absolute", sizeref=0.15, anchor="tip", hoverinfo='skip', showlegend=False), row=row,
-            col=col)
+        add_state_arrow(
+            fig, row=row, col=col, stokes_vec=stokes_vec,
+            color=state_color, name=name_prefix,
+        )
 
 
     if has_two_spheres:
         add_poincare_sphere(fig, row=1, col=sphere1_col, stokes_vec=S_in, name_prefix="Incident")
-        add_poincare_sphere(fig, row=1, col=sphere2_col, stokes_vec=S_out, name_prefix="Transmitted")
+        # S_out is the wave-plate output, i.e. the state BEFORE the polarizer.
+        add_poincare_sphere(
+            fig, row=1, col=sphere2_col, stokes_vec=S_out,
+            name_prefix="Before polarizer" if st.session_state.insert_pol else "Transmitted",
+            state_color="#555555" if st.session_state.insert_pol else "green",
+        )
 
         if st.session_state.insert_wp:
             n_x, n_y = np.cos(2 * wp_angle), np.sin(2 * wp_angle)
@@ -819,7 +852,7 @@ if st.session_state.show_poincare:
                 go.Scatter3d(x=a_x, y=a_y, z=a_z, mode='lines', line=dict(color='orange', width=3), hoverinfo='skip',
                              showlegend=False), row=1, col=sphere1_col)
             fig.add_trace(
-                go.Scatter3d(x=t_x, y=t_y, z=t_z, mode='text', text=t_v, textfont=dict(color='orange', size=15),
+                go.Scatter3d(x=t_x, y=t_y, z=t_z, mode='text', text=t_v, textfont=dict(color='orange', size=STATE_LABEL_SIZE),
                              hoverinfo='skip', showlegend=False), row=1, col=sphere1_col)
 
             # Retardance Arc Poincare
@@ -849,13 +882,17 @@ if st.session_state.show_poincare:
                         showscale=False, sizemode="absolute", sizeref=0.1, anchor="tip", hoverinfo='skip',
                         showlegend=False), row=1, col=sphere1_col)
             fig.add_trace(go.Scatter3d(x=t_x, y=t_y, z=t_z, mode='text', text=t_v, textposition='top right',
-                                       textfont=dict(color='darkorange', size=24), hoverinfo='skip', showlegend=False),
+                                       textfont=dict(color='darkorange', size=STATE_LABEL_SIZE), hoverinfo='skip', showlegend=False),
                           row=1, col=sphere1_col)
 
         if st.session_state.insert_pol:
-            fig.add_trace(go.Scatter3d(x=[0, S_pol_axis[0]], y=[0, S_pol_axis[1]], z=[0, S_pol_axis[2]], mode='lines',
-                                       line=dict(width=4, dash='dashdot'), hoverinfo='skip', showlegend=False), row=1,
-                          col=sphere2_col)
+            # For an ideal linear polarizer, the normalized transmitted state
+            # lies on its transmission axis. At extinction it is undefined.
+            add_state_arrow(
+                fig, row=1, col=sphere2_col, stokes_vec=S_pol_axis,
+                color="green", name="After polarizer",
+                visible=intensity_percent > 1e-10,
+            )
             fig.add_trace(go.Scatter3d(x=[S_pol_axis[0]], y=[S_pol_axis[1]], z=[S_pol_axis[2]], mode='text',
                                        text=[f"Pol ({intensity_percent:.0f}%)<br>"], textposition='top center',
                                        textfont=dict(size=15), hoverinfo='skip', showlegend=False), row=1,
