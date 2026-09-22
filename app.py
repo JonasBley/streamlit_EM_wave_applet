@@ -592,8 +592,9 @@ with col4:
         st.checkbox("Show Poincaré Sphere(s)", key="show_poincare")
 
 # --- 5. VISUALIZATION ---
-# Shared size for Jones reference labels and wave-plate angle labels.
-STATE_LABEL_SIZE = 24
+# Independent sizes: keep the Jones references at their original size.
+JONES_LABEL_SIZE = 18
+WP_LABEL_SIZE = 32
 
 spatial_title = f"Spatial Propagation"
 has_two_spheres = st.session_state.insert_wp or st.session_state.insert_pol
@@ -698,14 +699,14 @@ if st.session_state.insert_wp:
     arc_x, arc_y, arc_z = ([z_wp_in] * 20, arc_r * np.cos(arc_t), arc_r * np.sin(arc_t)) if arc_cond else ([None],
                                                                                                            [None],
                                                                                                            [None])
-    txt_x, txt_y, txt_z, txt_v = ([z_wp_in], [(arc_r + 0.2) * np.cos(wp_angle / 2)],
-                                  [(arc_r + 0.2) * np.sin(wp_angle / 2)], ['Δ']) if arc_cond else ([None], [None],
+    txt_x, txt_y, txt_z, txt_v = ([z_wp_in], [(arc_r + 0.08) * np.cos(wp_angle / 2)],
+                                  [(arc_r + 0.08) * np.sin(wp_angle / 2)], ['Δ']) if arc_cond else ([None], [None],
                                                                                                    [None], [''])
     fig.add_trace(
         go.Scatter3d(x=arc_x, y=arc_y, z=arc_z, mode='lines', line=dict(color='orange', width=2), hoverinfo='skip',
                      showlegend=False), row=1, col=spatial_col)
     fig.add_trace(
-        go.Scatter3d(x=txt_x, y=txt_y, z=txt_z, mode='text', text=txt_v, textfont=dict(color='orange', size=STATE_LABEL_SIZE),
+        go.Scatter3d(x=txt_x, y=txt_y, z=txt_z, mode='text', text=txt_v, textposition='middle center', textfont=dict(color='orange', size=WP_LABEL_SIZE),
                      hoverinfo='skip', showlegend=False), row=1, col=spatial_col)
 
 if st.session_state.insert_pol:
@@ -811,7 +812,7 @@ if st.session_state.show_poincare:
         # Keep the reference states on the sphere, inside the scene's ±1.2 limits.
         ref_x, ref_y, ref_z = [1, -1, 0, 0, 0, 0], [0, 0, 1, -1, 0, 0], [0, 0, 0, 0, 1, -1]
         fig.add_trace(go.Scatter3d(x=ref_x, y=ref_y, z=ref_z, mode='markers+text', marker=dict(color='gray', size=3),
-                                   text=ref_labels, textposition='bottom center', textfont=dict(size=STATE_LABEL_SIZE),
+                                   text=ref_labels, textposition='bottom center', textfont=dict(size=JONES_LABEL_SIZE),
                                    meta=dict(role='jones_reference_labels'),
                                    hoverinfo='skip', showlegend=False), row=row, col=col)
 
@@ -846,13 +847,13 @@ if st.session_state.show_poincare:
             arc_r2 = 0.6
             a_x, a_y, a_z = (arc_r2 * np.cos(arc_t2), arc_r2 * np.sin(arc_t2), np.zeros_like(arc_t2)) if arc_cond else (
                 [None], [None], [None])
-            t_x, t_y, t_z, t_v = ([(arc_r2 + 0.2) * np.cos(wp_angle)], [(arc_r2 + 0.2) * np.sin(wp_angle)], [0],
+            t_x, t_y, t_z, t_v = ([(arc_r2 + 0.08) * np.cos(wp_angle)], [(arc_r2 + 0.08) * np.sin(wp_angle)], [0],
                                   ['2Δ']) if arc_cond else ([None], [None], [None], [''])
             fig.add_trace(
                 go.Scatter3d(x=a_x, y=a_y, z=a_z, mode='lines', line=dict(color='orange', width=3), hoverinfo='skip',
                              showlegend=False), row=1, col=sphere1_col)
             fig.add_trace(
-                go.Scatter3d(x=t_x, y=t_y, z=t_z, mode='text', text=t_v, textfont=dict(color='orange', size=STATE_LABEL_SIZE),
+                go.Scatter3d(x=t_x, y=t_y, z=t_z, mode='text', text=t_v, textposition='middle center', textfont=dict(color='orange', size=WP_LABEL_SIZE),
                              hoverinfo='skip', showlegend=False), row=1, col=sphere1_col)
 
             # Retardance Arc Poincare
@@ -881,8 +882,8 @@ if st.session_state.show_poincare:
                 go.Cone(x=c_x, y=c_y, z=c_z, u=c_u, v=c_v, w=c_w, colorscale=[[0, 'darkorange'], [1, 'darkorange']],
                         showscale=False, sizemode="absolute", sizeref=0.1, anchor="tip", hoverinfo='skip',
                         showlegend=False), row=1, col=sphere1_col)
-            fig.add_trace(go.Scatter3d(x=t_x, y=t_y, z=t_z, mode='text', text=t_v, textposition='top right',
-                                       textfont=dict(color='darkorange', size=STATE_LABEL_SIZE), hoverinfo='skip', showlegend=False),
+            fig.add_trace(go.Scatter3d(x=t_x, y=t_y, z=t_z, mode='text', text=t_v, textposition='top center',
+                                       textfont=dict(color='darkorange', size=WP_LABEL_SIZE), hoverinfo='skip', showlegend=False),
                           row=1, col=sphere1_col)
 
         if st.session_state.insert_pol:
