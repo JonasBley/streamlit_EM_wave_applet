@@ -7,9 +7,8 @@ import re
 import random
 import uuid
 import os
-import csv
-from datetime import datetime
-from challenges import CHALLENGES
+from urllib.parse import urlencode
+from challenges import CHALLENGES, CONDITIONS, step_setup, GLOSSARY, SPHERE_GLOSSARY
 from latex2mathml.converter import convert as latex_to_mathml
 
 st.set_page_config(page_title="Interactive Polarization Challenges", layout="wide")
@@ -222,11 +221,11 @@ if st.session_state.show_landing:
         </div>
 
         <div style="background-color: #e8f5e9; color: black; padding: 15px; border-radius: 8px; border: 2px solid #4caf50; margin-bottom: 10px;">
-            💡 <b>3. Getting Help:</b> If you don't know how to proceed, you can use the <b>Show Hint</b> button below the applet. If you are entirely stuck, you can reveal the answer using the <b>Show Solution</b> button at the bottom right.
+            💡 <b>3. Getting Help:</b> If you don't know how to proceed, you can use the <b>Show Hint</b> button below the applet. If you are entirely stuck, you can automatically apply example settings using the <b>Show Solution</b> button at the bottom right.
         </div>
 
         <div style="background-color: #e3f2fd; color: black; padding: 15px; border-radius: 8px; border: 2px solid #2196f3; margin-bottom: 25px;">
-            🎓 <b>4. Moving Forward:</b> When your sliders hit the correct values, an explanation box like this one will appear at the bottom. <b>Make sure to read it carefully</b>, and then proceed using the <b>Next Step</b> button.
+            🎓 <b>4. Moving Forward:</b> When your sliders hit the correct values, an explanation box like this one will appear at the bottom. <b>Make sure to read it carefully</b>, and then proceed using the <b>Next Step</b> button. <b>Back</b> opens the previous page in its solved state; <b>Reset</b> restores the current page’s starting settings.
         </div>
         """,
         unsafe_allow_html=True
@@ -252,13 +251,6 @@ if "participant_id" not in st.session_state:
     else:
         st.session_state.participant_id = "UNKNOWN_ID"
 
-# Capture whether this participant is running with Eye-Tracking (1) or without (0)
-if "et_status" not in st.session_state:
-    if "et" in st.query_params:
-        st.session_state.et_status = st.query_params["et"]
-    else:
-        st.session_state.et_status = "0"  # Default to 0 if missing
-
 # Randomly assign cohort to Polarization 1 or Polarization 2
 if "assigned_journey" not in st.session_state:
     st.session_state.assigned_journey = random.choice(["Polarization 1", "Polarization 2"])
@@ -270,7 +262,7 @@ if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 
 DEFAULTS = {
-    "E_x_amp": 0.707, "phase_relative_pi": 0.0,
+    "E_x_amp": 2 ** -0.5, "phase_relative_pi": 0.0,
     "insert_wp": True, "wp_angle_deg": 45.0, "retardance_pi": 0.5,
     "insert_pol": False, "pol_angle_deg": 90.0,
     "show_combined": True, "show_ex": True, "show_ey": True, "show_axis": True,
@@ -289,11 +281,10 @@ def log_action(action_name):
     pass
 
 
-def load_step_setup(challenge_name, step_index):
-    step_data = CHALLENGES[challenge_name]["steps"][step_index]
-    st.session_state["disable_keys"] = []
-    for k, v in step_data.get("setup", {}).items():
-        st.session_state[k] = v
+def load_step_setup(challenge_name, step_index, solved=False):
+    st.session_state.update(step_setup(challenge_name, step_index, solved))
+    st.session_state.solution_origin = "review" if solved else None
+
 
 
 if "tutorial_initialized" not in st.session_state:
@@ -304,17 +295,23 @@ if "tutorial_initialized" not in st.session_state:
 
 
 def reset_challenge():
-    st.session_state.current_step = 0
     st.session_state.show_hint = False
-    load_step_setup(st.session_state.current_challenge, 0)
-    log_action("Reset Challenge")
+    load_step_setup(st.session_state.current_challenge, st.session_state.current_step)
+    st.session_state.view_reset = st.session_state.get("view_reset", 0) + 1
+
+
+def back_step():
+    if st.session_state.current_step > 0:
+        st.session_state.current_step -= 1
+        st.session_state.show_hint = False
+        st.session_state.scroll_to_top = True
+        load_step_setup(st.session_state.current_challenge, st.session_state.current_step, solved=True)
 
 
 def next_step():
-    log_action("Clicked Next Step")
     st.session_state.current_step += 1
     st.session_state.show_hint = False
-    st.session_state.scroll_to_top = True  # Triggers the JS auto-scroll on the next render
+    st.session_state.scroll_to_top = True
     load_step_setup(st.session_state.current_challenge, st.session_state.current_step)
 
 
@@ -334,7 +331,13 @@ def solve_challenge():
 
     for k, v in step_data.get("solution", {}).items():
         st.session_state[k] = v
+    st.session_state.solution_origin = "shown"
 
+
+# Keep the study restriction effective even on the completion page.
+sphere_allowed = CONDITIONS.get(st.session_state.current_challenge, {"sphere": True})["sphere"]
+if not sphere_allowed:
+    st.session_state.show_poincare = False
 
 # --- 2. PHYSICS EXTRACTION & SIMULATION ---
 E_x_amp = st.session_state.E_x_amp
@@ -423,7 +426,7 @@ S_out[2] = 2 * A_x_wp * A_y_wp * np.sin(delta_wp)
 S_pol_axis = np.array([np.cos(2 * pol_angle), np.sin(2 * pol_angle), 0])
 
 if st.session_state.insert_pol:
-    S_final = S_pol_axis.tolist()
+    S_final = S_pol_axis.tolist() if intensity_percent > 1e-10 else None
 elif st.session_state.insert_wp:
     S_final = S_out.tolist()
 else:
@@ -449,17 +452,17 @@ def check_target_met(target_dict, derived):
         if isinstance(actual, np.ndarray):
             actual = actual.tolist()
 
+        tol = 0.05 if key == "intensity_percent" or key.endswith("_deg") else 0.0005
         if isinstance(expected, list):
             if isinstance(actual, list):
                 if len(expected) > 0 and isinstance(expected[0], list):
-                    if not any(np.allclose(actual, e, atol=0.015) for e in expected): return False
+                    if not any(np.allclose(actual, e, atol=0.002, rtol=0) for e in expected): return False
                 else:
-                    if not np.allclose(actual, expected, atol=0.015): return False
+                    if not np.allclose(actual, expected, atol=0.002, rtol=0): return False
             else:
-                if not any(abs(actual - e) < 0.015 for e in expected): return False
+                if not any(abs(actual - e) <= tol for e in expected): return False
 
         elif type(expected) in (float, int) and type(actual) in (float, int, np.float64, np.float32):
-            tol = 1.5 if "percent" in key else 0.015
             if abs(actual - expected) > tol: return False
         else:
             if actual != expected: return False
@@ -517,6 +520,10 @@ if processed_task:
         f"<div style='background-color: #ffe0b2; color: black; padding: 15px; border-radius: 8px; font-size: 16px; border: 2px solid #ff9800; margin-bottom: 15px;'><div style='line-height: 1.6;'>🎯 <b>Task:</b> {processed_task}</div></div>",
         unsafe_allow_html=True)
 
+if step_data.get("example"):
+    with st.expander("🧩 Worked operator example"):
+        st.markdown(process_math(step_data["example"]), unsafe_allow_html=True)
+
 target_met = check_target_met(step_data.get("target", {}), derived_state)
 if is_last_step and st.session_state.current_challenge != "Free Play":
     st.success("Challenge Completed!")
@@ -555,7 +562,7 @@ col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
 with col1:
     st.subheader(r"Incident Wave")
     st.write(r"$\vec{E} = \begin{pmatrix} E_x \\ E_y e^{i\varphi} \end{pmatrix}$")
-    create_synced_input(r"Amplitude $E_x$", 0.0, 1.0, 0.01, "E_x_amp")
+    create_synced_input(r"Amplitude $E_x$", 0.0, 1.0, 0.001, "E_x_amp")
     st.write(fr"$E_y=$ {np.sqrt(1.0 - st.session_state.E_x_amp ** 2):.3f}")
     create_synced_input(r"Relative Phase $\varphi$ ($\times\pi$ rad)", 0.0, 2.0, 0.125, "phase_relative_pi")
 
@@ -589,7 +596,13 @@ with col4:
         st.checkbox(r"$E_x$", key="show_ex")
         st.checkbox(r"$E_y$", key="show_ey")
         st.checkbox("Show Optical Axes", key="show_axis")
-        st.checkbox("Show Poincaré Sphere(s)", key="show_poincare")
+        if sphere_allowed:
+            st.checkbox("Show Poincaré Sphere(s)", key="show_poincare")
+
+if intensity_percent <= 1e-10:
+    st.info("No light is transmitted; an output polarization state is undefined.")
+if st.session_state.show_poincare and st.session_state.insert_pol:
+    st.caption("Schematic correction: the dotted connection joins the before/after states. It is not a physical trajectory or a projection through the sphere.")
 
 # --- 5. VISUALIZATION ---
 # Independent sizes: keep the Jones references at their original size.
@@ -602,7 +615,7 @@ has_two_spheres = st.session_state.insert_wp or st.session_state.insert_pol
 if st.session_state.show_poincare:
     if has_two_spheres:
         incident_title = "Incident State<br>(with WP Operator)" if st.session_state.insert_wp else "Incident State"
-        transmitted_title = f"Transmitted State<br>(with Polarizer Operator)<br>(Intensity: {intensity_percent:.1f}%)" if st.session_state.insert_pol else "Transmitted State"
+        transmitted_title = "Transmitted State<br>(with Polarizer Operator)" if st.session_state.insert_pol else "Transmitted State"
         fig = make_subplots(
             rows=1, cols=3, specs=[[{"type": "scene"}, {"type": "scene"}, {"type": "scene"}]],
             column_widths=[0.3, 0.40, 0.3], subplot_titles=(incident_title, spatial_title, transmitted_title),
@@ -880,7 +893,7 @@ if st.session_state.show_poincare:
                                        hoverinfo='skip', showlegend=False), row=1, col=sphere1_col)
             fig.add_trace(
                 go.Cone(x=c_x, y=c_y, z=c_z, u=c_u, v=c_v, w=c_w, colorscale=[[0, 'darkorange'], [1, 'darkorange']],
-                        showscale=False, sizemode="absolute", sizeref=0.1, anchor="tip", hoverinfo='skip',
+                        showscale=False, sizemode="absolute", sizeref=0.1, anchor="tail", hoverinfo='skip',
                         showlegend=False), row=1, col=sphere1_col)
             fig.add_trace(go.Scatter3d(x=t_x, y=t_y, z=t_z, mode='text', text=t_v, textposition='top center',
                                        textfont=dict(color='darkorange', size=WP_LABEL_SIZE), hoverinfo='skip', showlegend=False),
@@ -895,12 +908,12 @@ if st.session_state.show_poincare:
                 visible=intensity_percent > 1e-10,
             )
             fig.add_trace(go.Scatter3d(x=[S_pol_axis[0]], y=[S_pol_axis[1]], z=[S_pol_axis[2]], mode='text',
-                                       text=[f"Pol ({intensity_percent:.0f}%)<br>"], textposition='top center',
+                                       visible=intensity_percent > 1e-10, text=[f"Pol ({intensity_percent:.2f}%)<br>"], textposition='top center',
                                        textfont=dict(size=15), hoverinfo='skip', showlegend=False), row=1,
                           col=sphere2_col)
             fig.add_trace(
                 go.Scatter3d(x=[S_out[0], S_pol_axis[0]], y=[S_out[1], S_pol_axis[1]], z=[S_out[2], S_pol_axis[2]],
-                             mode='lines', line=dict(color='rgba(255, 255, 255, 0.4)', width=2, dash='dot'),
+                             mode='lines', visible=intensity_percent > 1e-10, name='Schematic connection', line=dict(color='gray', width=2, dash='dot'),
                              hoverinfo='skip', showlegend=False), row=1, col=sphere2_col)
 
             # Pol Arc Poincare
@@ -925,7 +938,7 @@ if st.session_state.show_poincare:
 # Change the revision only when cameras should reset (on a new step).
 current_step_id = (
     f"{st.session_state.current_challenge}:"
-    f"{st.session_state.current_step}"
+    f"{st.session_state.current_step}:{st.session_state.get('view_reset', 0)}"
 )
 
 scene_spatial_config = dict(
@@ -992,6 +1005,11 @@ else:
 
 show_camera_preserving_plot(fig, plot_config, scene_roles, current_step_id)
 
+if st.session_state.insert_pol:
+    _, intensity_column = st.columns([3, 1])
+    with intensity_column:
+        st.metric("Transmitted intensity (% of incident)", f"{intensity_percent:.2f}%")
+
 # --- 6. NAVIGATION, HINT, & EXPLANATION BOXES (BOTTOM) ---
 
 if st.session_state.show_hint and "hint" in step_data:
@@ -1001,10 +1019,20 @@ if st.session_state.show_hint and "hint" in step_data:
         unsafe_allow_html=True)
 
 if target_met and "explanation" in step_data and step_data["explanation"]:
+    feedback_title = {"shown": "Example solution shown", "review": "Solved example for review"}.get(st.session_state.get("solution_origin"), "Target reached")
     processed_explanation = process_math(step_data.get("explanation", ""))
     st.markdown(
-        f"<div style='background-color: #e3f2fd; color: black; padding: 20px; border-radius: 8px; font-size: 16px; border: 2px solid #2196f3; margin-bottom: 15px;'><div style='line-height: 1.6;'>🎓 <b>Correct! </b> {processed_explanation}</div></div>",
+        f"<div style='background-color: #e3f2fd; color: black; padding: 20px; border-radius: 8px; font-size: 16px; border: 2px solid #2196f3; margin-bottom: 15px;'><div style='line-height: 1.6;'>🎓 <b>{feedback_title}. </b> {processed_explanation}</div></div>",
         unsafe_allow_html=True)
+
+navigation_widths = [1.5, 1.5, 5.5, 1.5]
+nav_back, nav_reset, _, _ = st.columns(navigation_widths)
+with nav_back:
+    st.button("⬅️ Back", on_click=back_step, disabled=st.session_state.current_step == 0,
+              help="Open the previous page with its example solution applied.", use_container_width=True)
+with nav_reset:
+    st.button("🔄 Reset", on_click=reset_challenge,
+              help="Restore this page's starting settings and camera.", use_container_width=True)
 
 # --- ROUTING BUTTON LOGIC ---
 if is_last_step and st.session_state.current_challenge != "Free Play":
@@ -1016,15 +1044,14 @@ if is_last_step and st.session_state.current_challenge != "Free Play":
     survey_b_id = "658185"
     pid = st.session_state.participant_id
     journey = st.session_state.assigned_journey
-    et = st.session_state.et_status
 
-    return_url = f"{limesurvey_domain}/index.php/{survey_b_id}?journey={journey}"
+    return_url = f"{limesurvey_domain}/index.php/{survey_b_id}?" + urlencode({"pid": pid, "journey": journey})
 
     st.link_button("🚀 Return to Post-Test Survey", return_url, type="primary", use_container_width=True)
 
 elif not is_last_step:
     st.markdown("<br>", unsafe_allow_html=True)
-    col_btn_hint, col_btn_next, _spacer, col_btn_solve = st.columns([1.5, 1.5, 5.5, 1.5])
+    col_btn_hint, col_btn_next, _spacer, col_btn_solve = st.columns(navigation_widths)
 
     with col_btn_hint:
         if "hint" in step_data:
@@ -1037,6 +1064,12 @@ elif not is_last_step:
     with col_btn_solve:
         if "solution" in step_data:
             st.button("✅ Show Solution", on_click=solve_challenge, use_container_width=True)
+
+
+with st.expander("📖 Glossary"):
+    st.markdown(GLOSSARY)
+    if sphere_allowed and st.session_state.current_step >= 2:
+        st.markdown(SPHERE_GLOSSARY)
 
 
 if st.session_state.pop("scroll_to_top", False):
