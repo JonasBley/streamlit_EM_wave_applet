@@ -1028,10 +1028,10 @@ if target_met and "explanation" in step_data and step_data["explanation"]:
 navigation_widths = [1.5, 1.5, 5.5, 1.5]
 nav_back, nav_reset, _, _ = st.columns(navigation_widths)
 with nav_back:
-    st.button("⬅️ Back", on_click=back_step, disabled=st.session_state.current_step == 0,
+    st.button("⬅️ Back one Page", on_click=back_step, disabled=st.session_state.current_step == 0,
               help="Open the previous page with its example solution applied.", use_container_width=True)
 with nav_reset:
-    st.button("🔄 Reset", on_click=reset_challenge,
+    st.button("🔄 Reset Page", on_click=reset_challenge,
               help="Restore this page's starting settings and camera.", use_container_width=True)
 
 # --- ROUTING BUTTON LOGIC ---
