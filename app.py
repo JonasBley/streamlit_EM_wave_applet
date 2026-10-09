@@ -12,7 +12,7 @@ from challenges import CHALLENGES, CONDITIONS, step_setup, GLOSSARY, SPHERE_GLOS
 from latex2mathml.converter import convert as latex_to_mathml
 
 # Use the actual post-survey ID after importing a new LimeSurvey copy.
-POST_SURVEY_URL = "https://umfrage.uni-leipzig.de/index.php/731002"
+POST_SURVEY_URL = "https://umfrage.uni-leipzig.de/index.php/932619"
 # Testing starts a fresh LimeSurvey preview and supplies TEST05 if no pid arrived.
 # Set to False before collecting participant data.
 POST_SURVEY_TEST_MODE = True
