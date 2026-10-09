@@ -11,6 +11,12 @@ from urllib.parse import urlencode
 from challenges import CHALLENGES, CONDITIONS, step_setup, GLOSSARY, SPHERE_GLOSSARY
 from latex2mathml.converter import convert as latex_to_mathml
 
+# Use the actual post-survey ID after importing a new LimeSurvey copy.
+POST_SURVEY_URL = "https://umfrage.uni-leipzig.de/index.php/731002"
+# Testing starts a fresh LimeSurvey preview and supplies TEST05 if no pid arrived.
+# Set to False before collecting participant data.
+POST_SURVEY_TEST_MODE = True
+
 st.set_page_config(page_title="Interactive Polarization Challenges", layout="wide")
 
 scroll_slot = st.empty()
@@ -244,12 +250,14 @@ if st.session_state.show_landing:
 
 # --- 1. SESSION STATE, COHORT ASSIGNMENT & LOGGING ENGINE ---
 
-# Capture the Participant ID from the URL right away
-if "participant_id" not in st.session_state:
-    if "pid" in st.query_params:
-        st.session_state.participant_id = st.query_params["pid"]
-    else:
-        st.session_state.participant_id = "UNKNOWN_ID"
+# Keep the pre-survey's code throughout the applet session.
+if "participant_id" not in st.session_state or st.session_state.participant_id == "UNKNOWN_ID":
+    incoming_pid = st.query_params.get("pid", "").strip().upper()
+    st.session_state.participant_id = incoming_pid or ("TEST05" if POST_SURVEY_TEST_MODE else "")
+
+if "survey_language" not in st.session_state:
+    incoming_language = st.query_params.get("lang", "en").strip().lower()
+    st.session_state.survey_language = incoming_language if incoming_language in ("de", "en") else "en"
 
 # Randomly assign cohort to Polarization 1 or Polarization 2
 if "assigned_journey" not in st.session_state:
@@ -1040,14 +1048,22 @@ if is_last_step and st.session_state.current_challenge != "Free Play":
     st.markdown("### 🎓 Unit Complete")
     st.markdown("Please click the button below to return to the survey and complete the final questions.")
 
-    limesurvey_domain = "https://umfrage.uni-leipzig.de"
-    survey_b_id = "658185"
     pid = st.session_state.participant_id
     journey = st.session_state.assigned_journey
 
-    return_url = f"{limesurvey_domain}/index.php/{survey_b_id}?" + urlencode({"pid": pid, "journey": journey})
-
-    st.link_button("🚀 Return to Post-Test Survey", return_url, type="primary", use_container_width=True)
+    if pid:
+        return_params = {
+            "pid": pid,
+            "journey": journey,
+            "lang": st.session_state.survey_language,
+            "appletcomplete": "1",
+        }
+        if POST_SURVEY_TEST_MODE:
+            return_params["newtest"] = "Y"
+        return_url = POST_SURVEY_URL + "?" + urlencode(return_params)
+        st.link_button("🚀 Return to Post-Test Survey", return_url, type="primary", use_container_width=True)
+    else:
+        st.warning("Your participant code is missing. Please reopen the applet using the link at the end of the first survey, or contact the study team.")
 
 elif not is_last_step:
     st.markdown("<br>", unsafe_allow_html=True)
