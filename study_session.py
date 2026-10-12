@@ -31,13 +31,13 @@ BOOLEAN_CONTROLS = (
 
 
 def normalize_study_code(value):
-    """Accept the current six-character code and proposed eight-character code.
+    """Accept four letters from the parents' first names + birth day (01--31).
 
-    The existing pre-survey uppercases four letters + day (01--31). The proposed
-    future format adds another pair of letters. Do not collect names or dates.
+    Only the resulting six-character code is supplied, never the full names
+    or date of birth. The pre-survey and app both normalize it to uppercase.
     """
     code = value.strip()
-    if not re.fullmatch(r"(?:[A-Za-z]{4}|[A-Za-z]{6})(?:0[1-9]|[12][0-9]|3[01])", code):
+    if not re.fullmatch(r"[A-Za-z]{4}(?:0[1-9]|[12][0-9]|3[01])", code):
         return None
     return code.upper()
 

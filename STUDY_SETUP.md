@@ -7,14 +7,18 @@ compatibility with the supplied LimeSurvey structures (pre: 731001; post:
 932619); it is not a LimeSurvey response ID. The app trims surrounding whitespace
 and uppercases the code, matching the pre-survey's `strtoupper(PIDINPUT.NAOK)`.
 
-Accepted codes are four letters plus a day from 01 to 31 (current survey), or
-six letters plus a day from 01 to 31 (proposed future self-generated code).
+Accepted codes contain exactly four letters plus a day from 01 to 31, for
+six characters in total. The letters are the first and last letter of the
+mother's first given name, then the first and last letter of the father's
+first given name (e.g. Anna, Peter, birthday on the fifth: `AAPR05`). No
+birthplace component is used. Eight-character codes are rejected.
 Missing or invalid codes cannot start the tutorial. There is no test-code
 fallback. The post-survey link sends `pid`, `journey`, `lang`, and
 `appletcomplete=1`. It does not force a fresh LimeSurvey session with `newtest=Y`.
 
-The exported post-survey maps all four of those fields to hidden questions.
-It also has an `appletseconds` field, which this app deliberately does not fill.
+The revised post-survey maps `pid`, `journey`, and `appletcomplete` to hidden
+questions; `lang` selects the survey language. The unused incoming
+`appletseconds` field was removed from the revised survey structures.
 Both exported surveys enable `savetimings` and `datestamp`. Their survey timing
 tables do not measure activity inside the external applet. Joining by code and
 subtracting the pre-survey `submitdate` from the post-survey `startdate` gives an
@@ -52,7 +56,8 @@ and version during data collection.
   browser refresh), and post-survey. Verify code, condition, completion flag,
   language, and timestamps in exported responses. Local tests validate the URL
   contract; they cannot verify the live survey configuration or saved records.
-- If adopting the proposed eight-character code, change `PIDINPUT`'s maximum
-  length from 6 to 8, its validation to
-  `/^[A-Za-z]{6}(0[1-9]|[12][0-9]|3[01])$/`, and its instructions in both languages.
+- Use the revised six-character survey structures, with `PIDINPUT`'s maximum
+  length set to 6 and validation `/^[A-Za-z]{4}(0[1-9]|[12][0-9]|3[01])$/`.
   Keep the hidden `pid` equation and the URL parameter names unchanged.
+  If importing creates new survey IDs, update the app's survey URLs before
+  deployment. Check the post-survey image references after import.

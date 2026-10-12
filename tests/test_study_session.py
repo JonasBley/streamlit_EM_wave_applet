@@ -41,8 +41,8 @@ class StudySessionTests(unittest.TestCase):
 
     def test_code_validation_and_normalization(self):
         self.assertEqual(normalize_study_code(' mapl05 '), 'MAPL05')
-        self.assertEqual(normalize_study_code('aapkln05'), 'AAPKLN05')
-        for code in ('', '123', 'ABC05', 'ABCD00', 'ABCD32', 'ÄBCD05', 'AB CD05', 'ABCD05<script>'):
+        self.assertEqual(normalize_study_code('aapr05'), 'AAPR05')
+        for code in ('', '123', 'ABC05', 'ABCD00', 'ABCD32', 'ÄBCD05', 'AB CD05', 'ABCD05<script>', 'AAPRBN05'):
             self.assertIsNone(normalize_study_code(code), code)
 
     def test_allocation_is_stable_and_both_conditions_exist(self):
@@ -54,7 +54,7 @@ class StudySessionTests(unittest.TestCase):
         self.assertEqual(condition_for_code('TEST01'), 'Polarization 1')
 
     def test_missing_invalid_codes_cannot_start_tutorial(self):
-        for params in ({}, {'pid': 'invalid'}, {'pid': 'ABCD00', 'lang': 'de'}):
+        for params in ({}, {'pid': 'invalid'}, {'pid': 'ABCD00', 'lang': 'de'}, {'pid': 'AAPRBN05'}):
             app = self.app(params)
             self.assertEqual(len(app.warning), 1)
             self.assertEqual(len(app.slider), 0)
