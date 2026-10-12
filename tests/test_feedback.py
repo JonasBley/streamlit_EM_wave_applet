@@ -12,11 +12,13 @@ from latex2mathml.converter import convert
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from challenges import CHALLENGES, CONDITIONS, step_setup
+from study_session import condition_for_code
 
 SOURCE = (ROOT / 'app.py').read_text(encoding='utf-8') + '''
 st.session_state['_test_derived'] = derived_state
 st.session_state['_test_met'] = target_met
 st.session_state['_test_figure'] = fig.to_dict()
+st.session_state['_test_wave_samples'] = [list(trace.x) for trace in fig.data[:3]]
 '''
 
 
@@ -27,10 +29,12 @@ def button(app, label):
 class FeedbackTests(unittest.TestCase):
     def app(self, journey):
         app = AppTest.from_string(SOURCE, default_timeout=20)
-        app.session_state['show_landing'] = False
-        app.session_state['assigned_journey'] = journey
-        app.query_params['pid'] = 'participant A+&/ä'
-        return app.run()
+        app.query_params['pid'] = next(
+            code for day in range(1, 32)
+            if condition_for_code(code := f'TEST{day:02}') == journey
+        )
+        app.run()
+        return button(app, '🚀 I understand, start the tutorial!').click().run()
 
     def clean(self, app):
         self.assertEqual(len(app.exception), 0, str(app.exception))
@@ -56,16 +60,43 @@ class FeedbackTests(unittest.TestCase):
                 button(app, '👣 Next Step ➔').click().run()
                 self.clean(app)
             url = app.get('link_button')[0].proto.url
-            self.assertEqual(parse_qs(urlparse(url).query), {'pid':['participant A+&/ä'], 'journey':[journey]})
+            self.assertEqual(parse_qs(urlparse(url).query), {
+                'pid': [app.session_state.study_code], 'journey': [journey],
+                'lang': ['en'], 'appletcomplete': ['1'],
+            })
             self.assertEqual(any('Poincaré' in c.label for c in app.checkbox), journey == 'Polarization 1')
+            # The completion controls must keep the wave visible after edits.
+            visibility_keys = ('show_ex', 'show_ey', 'show_combined', 'show_axis')
+            for key in visibility_keys:
+                self.assertTrue(app.checkbox(key=key).value, (journey, key))
+            for key, value in (('E_x_amp', .6), ('phase_relative_pi', .25),
+                               ('wp_angle_deg', 30), ('retardance_pi', .75),
+                               ('pol_angle_deg', 123)):
+                app.number_input(key=f'{key}_num').set_value(value).run()
+                self.clean(app)
+                for samples in app.session_state['_test_wave_samples']:
+                    self.assertEqual(len(samples), 600)
+                    self.assertTrue(np.isfinite(samples).all())
+            # Deliberately hiding a wave is respected until Reset is clicked.
+            for key in visibility_keys:
+                app.checkbox(key=key).uncheck().run()
+            app.number_input(key='wp_angle_deg_num').set_value(60).run()
+            for samples in app.session_state['_test_wave_samples']:
+                self.assertEqual(samples, [None])
+            button(app, '🔄 Reset Page').click().run()
+            self.clean(app)
+            for key in visibility_keys:
+                self.assertTrue(app.checkbox(key=key).value, (journey, key))
+            for samples in app.session_state['_test_wave_samples']:
+                self.assertEqual(len(samples), 600)
             # Completion edits must not leak back into the canonical solved state.
             app.number_input(key='pol_angle_deg_num').set_value(123).run()
-            button(app, '⬅️ Back').click().run()
+            button(app, '⬅️ Back one Page').click().run()
             self.clean(app)
             self.assertTrue(app.session_state['_test_met'])
             self.assertEqual(app.session_state.pol_angle_deg, 45)
             self.assertTrue(any('Solved example for review' in m.value for m in app.markdown))
-            button(app, '🔄 Reset').click().run()
+            button(app, '🔄 Reset Page').click().run()
             self.clean(app)
             self.assertEqual(app.session_state.current_step, 8)
             self.assertEqual(app.session_state.wp_angle_deg, 0)
@@ -74,14 +105,14 @@ class FeedbackTests(unittest.TestCase):
             self.assertFalse(app.session_state['_test_met'])
             # Walk back through every solved page and reset each one.
             for index in range(7,-1,-1):
-                button(app, '⬅️ Back').click().run()
+                button(app, '⬅️ Back one Page').click().run()
                 self.clean(app)
                 self.assertTrue(app.session_state['_test_met'], index)
-                button(app, '🔄 Reset').click().run()
+                button(app, '🔄 Reset Page').click().run()
                 self.clean(app)
                 for key, value in step_setup(journey,index).items():
                     self.assertEqual(app.session_state[key], value, (index,key))
-            self.assertTrue(button(app,'⬅️ Back').disabled)
+            self.assertTrue(button(app,'⬅️ Back one Page').disabled)
 
     def test_extinction_and_control_restriction(self):
         for journey in CONDITIONS:
@@ -114,6 +145,9 @@ class FeedbackTests(unittest.TestCase):
         self.clean(app)
         self.assertTrue(app.session_state['_test_met'])
         self.assertEqual(app.slider(key='E_x_amp_slider').value, .707)
+        self.assertEqual(app.number_input(key='E_x_amp_num').proto.format, '%.3f')
+        self.assertEqual(app.slider(key='E_x_amp_slider').proto.format, '%.3f')
+        self.assertEqual(app.number_input(key='phase_relative_pi_num').proto.format, '%.3f')
         app.number_input(key='E_x_amp_num').set_value(.710).run()
         self.assertFalse(app.session_state['_test_met'])
         for index in range(10):

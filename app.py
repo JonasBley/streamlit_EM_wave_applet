@@ -4,18 +4,15 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import re
-import random
 import uuid
-import os
 from urllib.parse import urlencode
 from challenges import CHALLENGES, CONDITIONS, step_setup, GLOSSARY, SPHERE_GLOSSARY
+from study_session import normalize_study_code, condition_for_code, encode_resume, decode_resume, input_format
 from latex2mathml.converter import convert as latex_to_mathml
 
 # Use the actual post-survey ID after importing a new LimeSurvey copy.
 POST_SURVEY_URL = "https://umfrage.uni-leipzig.de/index.php/932619"
-# Testing starts a fresh LimeSurvey preview and supplies TEST05 if no pid arrived.
-# Set to False before collecting participant data.
-POST_SURVEY_TEST_MODE = True
+PRE_SURVEY_URL = "https://umfrage.uni-leipzig.de/index.php/731001"
 
 st.set_page_config(page_title="Interactive Polarization Challenges", layout="wide")
 
@@ -203,9 +200,54 @@ def show_camera_preserving_plot(fig, config, scene_roles, revision):
 
 
 
-# --- 0. LANDING PAGE GATEKEEPER ---
-if "show_landing" not in st.session_state:
-    st.session_state.show_landing = True
+# --- 0. STUDY CODE, REFRESH RECOVERY & LANDING PAGE ---
+# "pid" is the existing LimeSurvey field name; its value is the hand-generated
+# study code, not a survey response ID or a newly generated participant ID.
+study_code = normalize_study_code(st.query_params.get("pid", ""))
+incoming_language = st.query_params.get("lang", "en").strip().lower()
+survey_language = incoming_language if incoming_language in ("de", "en") else "en"
+
+if study_code is None:
+    st.title("Polarization of Light")
+    if survey_language == "de":
+        st.warning("Der Teilnahmecode fehlt oder ist ungültig. Bitte öffnen Sie die Selbstlerneinheit über den Link am Ende der ersten Umfrage. Bei Schwierigkeiten wenden Sie sich an die Studienleitung.")
+        st.link_button("Zur ersten Umfrage", PRE_SURVEY_URL + "?lang=de")
+    else:
+        st.warning("Your study code is missing or invalid. Please open the tutorial using the link at the end of the first survey. If you need help, contact the study team.")
+        st.link_button("Open the first survey", PRE_SURVEY_URL + "?lang=en")
+    st.stop()
+
+if st.session_state.get("study_code") != study_code:
+    # A different code in the same tab must not inherit the previous settings.
+    st.session_state.clear()
+    journey = condition_for_code(study_code)
+    resume_token = st.query_params.get("resume", "")
+    restored = decode_resume(resume_token, study_code, journey)
+    st.session_state.update(step_setup(journey, 0))
+    st.session_state.update(
+        study_code=study_code, assigned_journey=journey, current_challenge=journey,
+        current_step=0, tutorial_initialized=True, show_landing=restored is None,
+        show_hint=False, solution_origin=None, view_reset=0,
+    )
+    if restored is not None:
+        st.session_state.update(restored)
+    elif resume_token:
+        st.info("The saved page could not be restored. Please start the tutorial again; your study group is unchanged.")
+st.session_state.survey_language = survey_language
+
+
+def save_browser_progress():
+    # Batch the URL update. No database, timing records, or action log is written.
+    params = st.query_params.to_dict()
+    params.update(pid=st.session_state.study_code,
+                  journey=st.session_state.assigned_journey,
+                  lang=st.session_state.survey_language)
+    if st.session_state.show_landing:
+        params.pop("resume", None)
+    else:
+        params["resume"] = encode_resume(st.session_state.study_code, st.session_state)
+    if params != st.query_params.to_dict():
+        st.query_params.from_dict(params)
 
 if st.session_state.show_landing:
     st.title("Welcome to this Interactive Polarization Applet")
@@ -243,50 +285,14 @@ if st.session_state.show_landing:
     with col2:
         if st.button("🚀 I understand, start the tutorial!", use_container_width=True):
             st.session_state.show_landing = False
+            save_browser_progress()
             st.rerun()
 
     # Stop the rest of the script from running while the landing page is active
+    save_browser_progress()
     st.stop()
 
-# --- 1. SESSION STATE, COHORT ASSIGNMENT & LOGGING ENGINE ---
-
-# Keep the pre-survey's code throughout the applet session.
-if "participant_id" not in st.session_state or st.session_state.participant_id == "UNKNOWN_ID":
-    incoming_pid = st.query_params.get("pid", "").strip().upper()
-    st.session_state.participant_id = incoming_pid or ("TEST05" if POST_SURVEY_TEST_MODE else "")
-
-if "survey_language" not in st.session_state:
-    incoming_language = st.query_params.get("lang", "en").strip().lower()
-    st.session_state.survey_language = incoming_language if incoming_language in ("de", "en") else "en"
-
-# Randomly assign cohort to Polarization 1 or Polarization 2
-if "assigned_journey" not in st.session_state:
-    st.session_state.assigned_journey = random.choice(["Polarization 1", "Polarization 2"])
-
-if "current_challenge" not in st.session_state:
-    st.session_state.current_challenge = st.session_state.assigned_journey
-
-if "session_id" not in st.session_state:
-    st.session_state.session_id = str(uuid.uuid4())
-
-DEFAULTS = {
-    "E_x_amp": 2 ** -0.5, "phase_relative_pi": 0.0,
-    "insert_wp": True, "wp_angle_deg": 45.0, "retardance_pi": 0.5,
-    "insert_pol": False, "pol_angle_deg": 90.0,
-    "show_combined": True, "show_ex": True, "show_ey": True, "show_axis": True,
-    "show_poincare": True,
-    "show_hint": False,
-    "show_toggles": True,
-    "disable_keys": []
-}
-
-for k, v in DEFAULTS.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
-
-
-def log_action(action_name):
-    pass
+# --- 1. TUTORIAL NAVIGATION ---
 
 
 def load_step_setup(challenge_name, step_index, solved=False):
@@ -295,17 +301,11 @@ def load_step_setup(challenge_name, step_index, solved=False):
 
 
 
-if "tutorial_initialized" not in st.session_state:
-    st.session_state.tutorial_initialized = True
-    st.session_state.current_challenge = st.session_state.assigned_journey
-    st.session_state.current_step = 0
-    load_step_setup(st.session_state.current_challenge, 0)
-
-
 def reset_challenge():
     st.session_state.show_hint = False
     load_step_setup(st.session_state.current_challenge, st.session_state.current_step)
     st.session_state.view_reset = st.session_state.get("view_reset", 0) + 1
+    save_browser_progress()
 
 
 def back_step():
@@ -314,6 +314,7 @@ def back_step():
         st.session_state.show_hint = False
         st.session_state.scroll_to_top = True
         load_step_setup(st.session_state.current_challenge, st.session_state.current_step, solved=True)
+        save_browser_progress()
 
 
 def next_step():
@@ -321,16 +322,15 @@ def next_step():
     st.session_state.show_hint = False
     st.session_state.scroll_to_top = True
     load_step_setup(st.session_state.current_challenge, st.session_state.current_step)
+    save_browser_progress()
 
 
 def toggle_hint():
     st.session_state.show_hint = not st.session_state.show_hint
-    action_str = "Showed Hint" if st.session_state.show_hint else "Hid Hint"
-    log_action(action_str)
+    save_browser_progress()
 
 
 def solve_challenge():
-    log_action("Clicked Show Solution")
     challenge_name = st.session_state.current_challenge
     step_index = st.session_state.current_step
     step_data = CHALLENGES[challenge_name]["steps"][step_index]
@@ -340,6 +340,7 @@ def solve_challenge():
     for k, v in step_data.get("solution", {}).items():
         st.session_state[k] = v
     st.session_state.solution_origin = "shown"
+    save_browser_progress()
 
 
 # Keep the study restriction effective even on the completion page.
@@ -541,6 +542,7 @@ def create_synced_input(label, min_val, max_val, step_val, base_key):
     slider_key = f"{base_key}_slider"
     num_key = f"{base_key}_num"
     is_disabled = base_key in st.session_state.get("disable_keys", [])
+    number_format = input_format(step_val)
 
     if (slider_key not in st.session_state) or (st.session_state[slider_key] != st.session_state[base_key]):
         st.session_state[slider_key] = float(st.session_state[base_key])
@@ -550,19 +552,21 @@ def create_synced_input(label, min_val, max_val, step_val, base_key):
     def sync_from_slider():
         st.session_state[base_key] = st.session_state[slider_key]
         st.session_state[num_key] = st.session_state[slider_key]
+        save_browser_progress()
 
     def sync_from_num():
         st.session_state[base_key] = st.session_state[num_key]
         st.session_state[slider_key] = st.session_state[num_key]
+        save_browser_progress()
 
     st.markdown(label)
     c1, c2 = st.columns([2.5, 1])
     with c1:
         st.slider(label, min_value=float(min_val), max_value=float(max_val), step=float(step_val), key=slider_key,
-                  on_change=sync_from_slider, label_visibility="collapsed", disabled=is_disabled)
+                  on_change=sync_from_slider, label_visibility="collapsed", disabled=is_disabled, format=number_format)
     with c2:
         st.number_input(label, min_value=float(min_val), max_value=float(max_val), step=float(step_val), key=num_key,
-                        on_change=sync_from_num, label_visibility="collapsed", disabled=is_disabled)
+                        on_change=sync_from_num, label_visibility="collapsed", disabled=is_disabled, format=number_format)
 
 
 col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
@@ -579,7 +583,7 @@ with col2:
         st.subheader("Wave Plate (WP)")
         if st.session_state.show_toggles:
             wp_disabled = "insert_wp" in st.session_state.get("disable_keys", [])
-            st.checkbox("Insert Wave Plate", key="insert_wp", disabled=wp_disabled)
+            st.checkbox("Insert Wave Plate", key="insert_wp", disabled=wp_disabled, on_change=save_browser_progress)
         if st.session_state.insert_wp:
             create_synced_input(r"WP Fast Axis Angle $\Delta$ (Degrees)", 0.0, 180.0, 0.5, "wp_angle_deg")
             create_synced_input(r"WP Retardance $\Gamma$ ($\times \pi$ rad)", 0.0, 2.0, 0.125, "retardance_pi")
@@ -591,7 +595,7 @@ with col3:
         st.subheader("Linear Polarizer")
         if st.session_state.show_toggles:
             pol_disabled = "insert_pol" in st.session_state.get("disable_keys", [])
-            st.checkbox("Insert Polarizer", key="insert_pol", disabled=pol_disabled)
+            st.checkbox("Insert Polarizer", key="insert_pol", disabled=pol_disabled, on_change=save_browser_progress)
         if st.session_state.insert_pol:
             create_synced_input(r"Transmission Axis $\theta$ (Degrees)", 0.0, 180.0, 1.0, "pol_angle_deg")
         elif st.session_state.show_toggles:
@@ -600,12 +604,12 @@ with col3:
 with col4:
     if st.session_state.show_toggles:
         st.subheader("Visualization Toggles")
-        st.checkbox("Combined Wave (Green)", key="show_combined")
-        st.checkbox(r"$E_x$", key="show_ex")
-        st.checkbox(r"$E_y$", key="show_ey")
-        st.checkbox("Show Optical Axes", key="show_axis")
+        st.checkbox("Combined Wave (Green)", key="show_combined", on_change=save_browser_progress)
+        st.checkbox(r"$E_x$", key="show_ex", on_change=save_browser_progress)
+        st.checkbox(r"$E_y$", key="show_ey", on_change=save_browser_progress)
+        st.checkbox("Show Optical Axes", key="show_axis", on_change=save_browser_progress)
         if sphere_allowed:
-            st.checkbox("Show Poincaré Sphere(s)", key="show_poincare")
+            st.checkbox("Show Poincaré Sphere(s)", key="show_poincare", on_change=save_browser_progress)
 
 if intensity_percent <= 1e-10:
     st.info("No light is transmitted; an output polarization state is undefined.")
@@ -1048,7 +1052,7 @@ if is_last_step and st.session_state.current_challenge != "Free Play":
     st.markdown("### 🎓 Unit Complete")
     st.markdown("Please click the button below to return to the survey and complete the final questions.")
 
-    pid = st.session_state.participant_id
+    pid = st.session_state.study_code
     journey = st.session_state.assigned_journey
 
     if pid:
@@ -1058,8 +1062,6 @@ if is_last_step and st.session_state.current_challenge != "Free Play":
             "lang": st.session_state.survey_language,
             "appletcomplete": "1",
         }
-        if POST_SURVEY_TEST_MODE:
-            return_params["newtest"] = "Y"
         return_url = POST_SURVEY_URL + "?" + urlencode(return_params)
         st.link_button("🚀 Return to Post-Test Survey", return_url, type="primary", use_container_width=True)
     else:
@@ -1086,6 +1088,9 @@ with st.expander("📖 Glossary"):
     st.markdown(GLOSSARY)
     if sphere_allowed and st.session_state.current_step >= 2:
         st.markdown(SPHERE_GLOSSARY)
+
+
+save_browser_progress()
 
 
 if st.session_state.pop("scroll_to_top", False):

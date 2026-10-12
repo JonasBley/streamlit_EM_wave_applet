@@ -337,6 +337,9 @@ def step_setup(challenge_name, step_index, solved=False):
         "E_x_amp": 2 ** -0.5, "phase_relative_pi": 0.0,
         "insert_wp": True, "wp_angle_deg": 0.0, "retardance_pi": 0.5,
         "insert_pol": False, "pol_angle_deg": 90.0,
+        # Reapply display defaults when entering or resetting a page. These
+        # checkbox keys may have been cleared while the controls were hidden.
+        "show_combined": True, "show_ex": True, "show_ey": True, "show_axis": True,
         "show_poincare": False, "show_toggles": False, "disable_keys": [],
     }
     steps = CHALLENGES[challenge_name]["steps"]
