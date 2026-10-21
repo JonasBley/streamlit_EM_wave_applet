@@ -10,9 +10,10 @@ from challenges import CHALLENGES, CONDITIONS, step_setup, GLOSSARY, SPHERE_GLOS
 from study_session import normalize_study_code, condition_for_code, encode_resume, decode_resume, input_format
 from latex2mathml.converter import convert as latex_to_mathml
 
-# Use the actual post-survey ID after importing a new LimeSurvey copy.
-POST_SURVEY_URL = "https://umfrage.uni-leipzig.de/index.php/932619"
-PRE_SURVEY_URL = "https://umfrage.uni-leipzig.de/index.php/731001"
+# Update these IDs after importing new survey copies. Keep query parameters
+# out of the base URLs: language and study parameters are appended below.
+POST_SURVEY_URL = "https://umfrage.uni-leipzig.de/index.php/385657"
+PRE_SURVEY_URL = "https://umfrage.uni-leipzig.de/index.php/861912"
 
 st.set_page_config(page_title="Interactive Polarization Challenges", layout="wide")
 
@@ -204,17 +205,13 @@ def show_camera_preserving_plot(fig, config, scene_roles, revision):
 # "pid" is the existing LimeSurvey field name; its value is the hand-generated
 # study code, not a survey response ID or a newly generated participant ID.
 study_code = normalize_study_code(st.query_params.get("pid", ""))
-incoming_language = st.query_params.get("lang", "en").strip().lower()
-survey_language = incoming_language if incoming_language in ("de", "en") else "en"
+# The main-phase surveys and applet are English-only, including older links.
+survey_language = "en"
 
 if study_code is None:
     st.title("Polarization of Light")
-    if survey_language == "de":
-        st.warning("Der Teilnahmecode fehlt oder ist ungültig. Bitte öffnen Sie die Selbstlerneinheit über den Link am Ende der ersten Umfrage. Bei Schwierigkeiten wenden Sie sich an die Studienleitung.")
-        st.link_button("Zur ersten Umfrage", PRE_SURVEY_URL + "?lang=de")
-    else:
-        st.warning("Your study code is missing or invalid. Please open the tutorial using the link at the end of the first survey. If you need help, contact the study team.")
-        st.link_button("Open the first survey", PRE_SURVEY_URL + "?lang=en")
+    st.warning("Your study code is missing or invalid. Please open the tutorial using the link at the end of the first survey. If you need help, contact the study team.")
+    st.link_button("Open the first survey", PRE_SURVEY_URL + "?lang=en")
     st.stop()
 
 if st.session_state.get("study_code") != study_code:

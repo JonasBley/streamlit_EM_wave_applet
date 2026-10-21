@@ -59,7 +59,10 @@ class StudySessionTests(unittest.TestCase):
             self.assertEqual(len(app.warning), 1)
             self.assertEqual(len(app.slider), 0)
             self.assertFalse(any('start the tutorial' in b.label for b in app.button))
-            self.assertIn('731001', app.get('link_button')[0].proto.url)
+            self.assertIn('Your study code is missing or invalid.', app.warning[0].value)
+            url = app.get('link_button')[0].proto.url
+            self.assertEqual(urlparse(url).path, '/index.php/861912')
+            self.assertEqual(parse_qs(urlparse(url).query), {'lang': ['en']})
 
     def test_refresh_preserves_step_values_hints_and_condition(self):
         for journey in CONDITIONS:
@@ -74,7 +77,8 @@ class StudySessionTests(unittest.TestCase):
             self.assertEqual(fresh.session_state.current_step, 1)
             self.assertEqual(fresh.session_state.assigned_journey, journey)
             self.assertEqual(fresh.session_state.study_code, code)
-            self.assertEqual(fresh.session_state.survey_language, 'de')
+            self.assertEqual(fresh.session_state.survey_language, 'en')
+            self.assertEqual(fresh.query_params['lang'], ['en'])
             self.assertEqual(fresh.number_input(key='E_x_amp_num').value, .707)
             self.assertTrue(fresh.session_state.show_hint)
             self.assertFalse(button(fresh, '👣 Next Step ➔').disabled)
@@ -99,9 +103,9 @@ class StudySessionTests(unittest.TestCase):
             self.assertFalse(fresh.checkbox(key='show_ex').value)
             self.assertEqual(fresh.session_state.show_poincare, journey == 'Polarization 1')
             url = fresh.get('link_button')[0].proto.url
-            self.assertEqual(urlparse(url).path, '/index.php/932619')
+            self.assertEqual(urlparse(url).path, '/index.php/385657')
             self.assertEqual(parse_qs(urlparse(url).query), {
-                'pid': [code], 'journey': [journey], 'lang': ['de'], 'appletcomplete': ['1'],
+                'pid': [code], 'journey': [journey], 'lang': ['en'], 'appletcomplete': ['1'],
             })
             button(fresh, '🔄 Reset Page').click().run()
             reset = self.refresh(fresh)

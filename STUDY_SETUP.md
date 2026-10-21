@@ -3,8 +3,8 @@
 ## Codes and survey handoff
 
 The `pid` URL field carries the hand-generated study code. It is retained for
-compatibility with the supplied LimeSurvey structures (pre: 731001; post:
-932619); it is not a LimeSurvey response ID. The app trims surrounding whitespace
+compatibility with the supplied LimeSurvey structures (pre: 861912; post:
+385657); it is not a LimeSurvey response ID. The app trims surrounding whitespace
 and uppercases the code, matching the pre-survey's `strtoupper(PIDINPUT.NAOK)`.
 
 Accepted codes contain exactly four letters plus a day from 01 to 31, for
@@ -15,6 +15,12 @@ birthplace component is used. Eight-character codes are rejected.
 Missing or invalid codes cannot start the tutorial. There is no test-code
 fallback. The post-survey link sends `pid`, `journey`, `lang`, and
 `appletcomplete=1`. It does not force a fresh LimeSurvey session with `newtest=Y`.
+
+The study is English-only. Incoming links with another `lang` value, including
+older German links, use English messages and are normalized to `lang=en` when
+study progress is saved. Both survey links always request English.
+Keep `PRE_SURVEY_URL` and `POST_SURVEY_URL` as base URLs without `?lang=en` or
+other query parameters; the app adds those parameters when creating the links.
 
 The revised post-survey maps `pid`, `journey`, and `appletcomplete` to hidden
 questions; `lang` selects the survey language. The unused incoming
