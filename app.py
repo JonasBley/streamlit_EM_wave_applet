@@ -14,8 +14,20 @@ from latex2mathml.converter import convert as latex_to_mathml
 # out of the base URLs: language and study parameters are appended below.
 POST_SURVEY_URL = "https://umfrage.uni-leipzig.de/index.php/385657"
 PRE_SURVEY_URL = "https://umfrage.uni-leipzig.de/index.php/861912"
+# Isolates standalone refresh checkpoints; never sent as a participant code.
+STANDALONE_RESUME_KEY = "standalone"
 
 st.set_page_config(page_title="Interactive Polarization Challenges", layout="wide")
+
+# Give the visualizations more horizontal room, including on smaller screens.
+st.markdown("""
+<style>
+[data-testid="stMainBlockContainer"] {
+    padding-left: clamp(0.75rem, 1.5vw, 1.5rem);
+    padding-right: clamp(0.75rem, 1.5vw, 1.5rem);
+}
+</style>
+""", unsafe_allow_html=True)
 
 scroll_slot = st.empty()
 
@@ -132,7 +144,21 @@ html, body { margin: 0; padding: 0; overflow: hidden; }
             // A scene number can change meaning when spheres are toggled.
             layout[scene].uirevision = revision + ":" + role;
             if (cameras[role]) layout[scene].camera = clone(cameras[role]);
-            else if (layout[scene].camera) cameras[role] = clone(layout[scene].camera);
+            else if (layout[scene].camera) {
+                // Fit the initial wave view to its available width. Only do
+                // this on a new step/reset, preserving subsequent user views.
+                if (role === "spatial" && Object.keys(roles).length > 1) {
+                    const domain = layout[scene].domain.x;
+                    const plotWidth = Math.max(1, chart.clientWidth - layout.margin.l - layout.margin.r);
+                    const sceneWidth = Math.max(1, plotWidth * (domain[1] - domain[0]));
+                    const plotHeight = args.height - layout.margin.t - layout.margin.b;
+                    const aspect = layout[scene].aspectratio.x;
+                    const scale = Math.max(0.65, plotHeight / sceneWidth * (aspect >= 4 ? 1.4 : 1.15));
+                    const eye = layout[scene].camera.eye;
+                    for (const axis of ["x", "y", "z"]) eye[axis] *= scale;
+                }
+                cameras[role] = clone(layout[scene].camera);
+            }
         }
         chart.style.height = args.height + "px";
         send("streamlit:setFrameHeight", {height: args.height});
@@ -208,18 +234,19 @@ study_code = normalize_study_code(st.query_params.get("pid", ""))
 # The main-phase surveys and applet are English-only, including older links.
 survey_language = "en"
 
-if study_code is None:
+if "pid" in st.query_params and study_code is None:
     st.title("Polarization of Light")
     st.warning("Your study code is missing or invalid. Please open the tutorial using the link at the end of the first survey. If you need help, contact the study team.")
     st.link_button("Open the first survey", PRE_SURVEY_URL + "?lang=en")
     st.stop()
 
-if st.session_state.get("study_code") != study_code:
-    # A different code in the same tab must not inherit the previous settings.
+if "study_code" not in st.session_state or st.session_state.study_code != study_code:
+    # Changing code or switching between study and standalone use starts fresh.
     st.session_state.clear()
-    journey = condition_for_code(study_code)
+    # Standalone visitors get the full tutorial, including the Poincare sphere.
+    journey = condition_for_code(study_code) if study_code else "Polarization 1"
     resume_token = st.query_params.get("resume", "")
-    restored = decode_resume(resume_token, study_code, journey)
+    restored = decode_resume(resume_token, study_code or STANDALONE_RESUME_KEY, journey)
     st.session_state.update(step_setup(journey, 0))
     st.session_state.update(
         study_code=study_code, assigned_journey=journey, current_challenge=journey,
@@ -229,31 +256,43 @@ if st.session_state.get("study_code") != study_code:
     if restored is not None:
         st.session_state.update(restored)
     elif resume_token:
-        st.info("The saved page could not be restored. Please start the tutorial again; your study group is unchanged.")
+        st.info("The saved page could not be restored. Please start the tutorial again."
+                + (" Your study group is unchanged." if study_code else ""))
 st.session_state.survey_language = survey_language
 
 
 def save_browser_progress():
     # Batch the URL update. No database, timing records, or action log is written.
     params = st.query_params.to_dict()
-    params.update(pid=st.session_state.study_code,
-                  journey=st.session_state.assigned_journey,
+    params.update(journey=st.session_state.assigned_journey,
                   lang=st.session_state.survey_language)
+    if st.session_state.study_code:
+        params["pid"] = st.session_state.study_code
+    else:
+        params.pop("pid", None)
     if st.session_state.show_landing:
         params.pop("resume", None)
     else:
-        params["resume"] = encode_resume(st.session_state.study_code, st.session_state)
+        params["resume"] = encode_resume(
+            st.session_state.study_code or STANDALONE_RESUME_KEY, st.session_state)
     if params != st.query_params.to_dict():
         st.query_params.from_dict(params)
 
 if st.session_state.show_landing:
     st.title("Welcome to this Interactive Polarization Applet")
 
-    st.markdown("""
+    if study_code:
+        st.markdown("""
     Thank you for participating in this study! In this module, you will interactively explore the physics of light polarization. During the study, please do not use any external tools including pen and paper.
 
     Before we begin, please read how the interface works:
-    """)
+        """)
+    else:
+        st.markdown("""
+    Explore the physics of light polarization with this interactive tutorial.
+
+    Before we begin, please read how the interface works:
+        """)
 
     st.markdown(
         """
@@ -486,6 +525,13 @@ st.caption(f"Active Module: {st.session_state.assigned_journey}")
 challenge_data = CHALLENGES[st.session_state.current_challenge]["steps"]
 step_data = challenge_data[st.session_state.current_step]
 is_last_step = st.session_state.current_step >= len(challenge_data) - 1
+if is_last_step and not study_code:
+    # Keep the study's shared instructions intact for participants.
+    step_data = {**step_data, "text": (
+        "<b>Tutorial Completed!</b><br>Congratulations, you have finished the "
+        "interactive physics module. Feel free to keep exploring the optical "
+        "elements below or revisit earlier pages.<br>"
+    )}
 
 
 def process_math(text):
@@ -616,7 +662,7 @@ if st.session_state.show_poincare and st.session_state.insert_pol:
 # --- 5. VISUALIZATION ---
 # Independent sizes: keep the Jones references at their original size.
 JONES_LABEL_SIZE = 18
-WP_LABEL_SIZE = 32
+WP_LABEL_SIZE = 24
 
 spatial_title = f"Spatial Propagation"
 has_two_spheres = st.session_state.insert_wp or st.session_state.insert_pol
@@ -627,13 +673,15 @@ if st.session_state.show_poincare:
         transmitted_title = "Transmitted State<br>(with Polarizer Operator)" if st.session_state.insert_pol else "Transmitted State"
         fig = make_subplots(
             rows=1, cols=3, specs=[[{"type": "scene"}, {"type": "scene"}, {"type": "scene"}]],
-            column_widths=[0.3, 0.40, 0.3], subplot_titles=(incident_title, spatial_title, transmitted_title),
+            column_widths=[0.22, 0.56, 0.22], horizontal_spacing=0.012,
+            subplot_titles=(incident_title, spatial_title, transmitted_title),
         )
         sphere1_col, spatial_col, sphere2_col = 1, 2, 3
     else:
         fig = make_subplots(
             rows=1, cols=2, specs=[[{"type": "scene"}, {"type": "scene"}]],
-            column_widths=[0.4, 0.6], subplot_titles=("Polarization State", spatial_title),
+            column_widths=[0.28, 0.72], horizontal_spacing=0.012,
+            subplot_titles=("Polarization State", spatial_title),
         )
         sphere1_col, spatial_col = 1, 2
 else:
@@ -972,7 +1020,7 @@ scene_spatial_config["camera"] = dict(
     eye=dict(x=1.2, y=-3.8, z=1.2)
 )
 scene_poincare_config["camera"] = dict(
-    eye=dict(x=1.5, y=1.5, z=1.5)
+    eye=dict(x=1.9, y=1.9, z=1.9)
 )
 
 for annotation in fig['layout']['annotations']:
@@ -980,7 +1028,8 @@ for annotation in fig['layout']['annotations']:
 
 layout_args = dict(
     height=700 if st.session_state.show_poincare else 500,
-    margin=dict(l=10, r=10, b=10, t=40),
+    margin=dict(l=10, r=10, b=55, t=40),
+    legend=dict(orientation="h", x=0.5, xanchor="center", y=-0.04, yanchor="top"),
     uirevision=current_step_id
 )
 
@@ -1034,8 +1083,8 @@ if target_met and "explanation" in step_data and step_data["explanation"]:
         f"<div style='background-color: #e3f2fd; color: black; padding: 20px; border-radius: 8px; font-size: 16px; border: 2px solid #2196f3; margin-bottom: 15px;'><div style='line-height: 1.6;'>🎓 <b>{feedback_title}. </b> {processed_explanation}</div></div>",
         unsafe_allow_html=True)
 
-navigation_widths = [1.5, 1.5, 5.5, 1.5]
-nav_back, nav_reset, _, _ = st.columns(navigation_widths)
+navigation_widths = [1.2, 1, 1, 1, 1.2]
+nav_back, nav_reset, nav_hint, nav_next, nav_solve = st.columns(navigation_widths, gap="small")
 with nav_back:
     st.button("⬅️ Back one Page", on_click=back_step, disabled=st.session_state.current_step == 0,
               help="Open the previous page with its example solution applied.", use_container_width=True)
@@ -1043,16 +1092,29 @@ with nav_reset:
     st.button("🔄 Reset Page", on_click=reset_challenge,
               help="Restore this page's starting settings and camera.", use_container_width=True)
 
+if not is_last_step:
+    with nav_hint:
+        if "hint" in step_data:
+            btn_text = "💡 Hide Hint" if st.session_state.show_hint else "💡 Show Hint"
+            st.button(btn_text, on_click=toggle_hint, use_container_width=True)
+
+    with nav_next:
+        st.button("👣 Next Step ➔", disabled=not target_met, on_click=next_step, use_container_width=True)
+
+    with nav_solve:
+        if "solution" in step_data:
+            st.button("✅ Show Solution", on_click=solve_challenge, use_container_width=True)
+
 # --- ROUTING BUTTON LOGIC ---
 if is_last_step and st.session_state.current_challenge != "Free Play":
     st.divider()
     st.markdown("### 🎓 Unit Complete")
-    st.markdown("Please click the button below to return to the survey and complete the final questions.")
 
     pid = st.session_state.study_code
     journey = st.session_state.assigned_journey
 
     if pid:
+        st.markdown("Please click the button below to return to the survey and complete the final questions.")
         return_params = {
             "pid": pid,
             "journey": journey,
@@ -1062,24 +1124,7 @@ if is_last_step and st.session_state.current_challenge != "Free Play":
         return_url = POST_SURVEY_URL + "?" + urlencode(return_params)
         st.link_button("🚀 Return to Post-Test Survey", return_url, type="primary", use_container_width=True)
     else:
-        st.warning("Your participant code is missing. Please reopen the applet using the link at the end of the first survey, or contact the study team.")
-
-elif not is_last_step:
-    st.markdown("<br>", unsafe_allow_html=True)
-    col_btn_hint, col_btn_next, _spacer, col_btn_solve = st.columns(navigation_widths)
-
-    with col_btn_hint:
-        if "hint" in step_data:
-            btn_text = "💡 Hide Hint" if st.session_state.show_hint else "💡 Show Hint"
-            st.button(btn_text, on_click=toggle_hint, use_container_width=True)
-
-    with col_btn_next:
-        st.button("👣 Next Step ➔", disabled=not target_met, on_click=next_step, use_container_width=True)
-
-    with col_btn_solve:
-        if "solution" in step_data:
-            st.button("✅ Show Solution", on_click=solve_challenge, use_container_width=True)
-
+        st.markdown("You can continue exploring the applet or close this page whenever you are finished.")
 
 with st.expander("📖 Glossary"):
     st.markdown(GLOSSARY)

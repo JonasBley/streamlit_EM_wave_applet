@@ -53,8 +53,8 @@ class StudySessionTests(unittest.TestCase):
         self.assertEqual(condition_for_code('MAPL05'), 'Polarization 2')
         self.assertEqual(condition_for_code('TEST01'), 'Polarization 1')
 
-    def test_missing_invalid_codes_cannot_start_tutorial(self):
-        for params in ({}, {'pid': 'invalid'}, {'pid': 'ABCD00', 'lang': 'de'}, {'pid': 'AAPRBN05'}):
+    def test_explicit_invalid_codes_cannot_start_tutorial(self):
+        for params in ({'pid': ''}, {'pid': 'invalid'}, {'pid': 'ABCD00', 'lang': 'de'}, {'pid': 'AAPRBN05'}):
             app = self.app(params)
             self.assertEqual(len(app.warning), 1)
             self.assertEqual(len(app.slider), 0)
@@ -63,6 +63,73 @@ class StudySessionTests(unittest.TestCase):
             url = app.get('link_button')[0].proto.url
             self.assertEqual(urlparse(url).path, '/index.php/861912')
             self.assertEqual(parse_qs(urlparse(url).query), {'lang': ['en']})
+
+    def test_normal_link_completes_without_survey_button(self):
+        app = self.app({})
+        self.assertIsNone(app.session_state.study_code)
+        self.assertFalse(app.warning)
+        self.assertFalse(any('participating in this study' in m.value for m in app.markdown))
+        self.assertNotIn('pid', app.query_params)
+        button(app, '🚀 I understand, start the tutorial!').click().run()
+        for index in range(9):
+            self.assertFalse(app.exception)
+            self.assertEqual(app.session_state.current_step, index)
+            self.assertEqual(app.session_state.show_poincare, index >= 2)
+            button(app, '✅ Show Solution').click().run()
+            self.assertFalse(button(app, '👣 Next Step ➔').disabled)
+            button(app, '👣 Next Step ➔').click().run()
+        self.assertFalse(app.exception)
+        self.assertEqual(app.session_state.current_step, 9)
+        self.assertFalse(app.get('link_button'))
+        self.assertFalse(app.warning)
+        self.assertFalse(any('survey' in m.value.lower() or 'return button' in m.value.lower()
+                             for m in app.markdown))
+        self.assertNotIn('pid', app.query_params)
+        fresh = self.refresh(app)
+        self.assertEqual(fresh.session_state.current_step, 9)
+        self.assertIsNone(fresh.session_state.study_code)
+        self.assertFalse(fresh.get('link_button'))
+
+    def test_standalone_refresh_preserves_progress(self):
+        app = self.app({'lang': 'de'}, start=True)
+        app.number_input(key='E_x_amp_num').set_value(.5).run()
+        button(app, '👣 Next Step ➔').click().run()
+        app.number_input(key='E_x_amp_num').set_value(.707).run()
+        button(app, '💡 Show Hint').click().run()
+        fresh = self.refresh(app)
+        self.assertEqual(fresh.session_state.current_step, 1)
+        self.assertEqual(fresh.number_input(key='E_x_amp_num').value, .707)
+        self.assertTrue(fresh.session_state.show_hint)
+        self.assertEqual(fresh.session_state.survey_language, 'en')
+        self.assertIsNone(fresh.session_state.study_code)
+        self.assertNotIn('pid', fresh.query_params)
+        self.assertFalse(fresh.get('link_button'))
+
+    def test_switching_study_and_standalone_does_not_share_progress(self):
+        code = code_for('Polarization 2')
+        state = step_setup('Polarization 2', 9)
+        state['current_step'] = 9
+        app = self.app({'pid': code, 'resume': encode_resume(code, state)})
+        self.assertTrue(app.get('link_button'))
+        del app.query_params['pid']
+        app.run()
+        self.assertFalse(app.exception)
+        self.assertIsNone(app.session_state.study_code)
+        self.assertTrue(app.session_state.show_landing)
+        self.assertEqual(app.session_state.current_step, 0)
+        self.assertEqual(app.session_state.assigned_journey, 'Polarization 1')
+        self.assertFalse(app.get('link_button'))
+        button(app, '🚀 I understand, start the tutorial!').click().run()
+        button(app, '✅ Show Solution').click().run()
+        button(app, '👣 Next Step ➔').click().run()
+        self.assertEqual(app.session_state.current_step, 1)
+        app.query_params['pid'] = code
+        app.run()
+        self.assertFalse(app.exception)
+        self.assertEqual(app.session_state.study_code, code)
+        self.assertEqual(app.session_state.assigned_journey, 'Polarization 2')
+        self.assertTrue(app.session_state.show_landing)
+        self.assertEqual(app.session_state.current_step, 0)
 
     def test_refresh_preserves_step_values_hints_and_condition(self):
         for journey in CONDITIONS:

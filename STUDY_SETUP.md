@@ -12,9 +12,18 @@ six characters in total. The letters are the first and last letter of the
 mother's first given name, then the first and last letter of the father's
 first given name (e.g. Anna, Peter, birthday on the fifth: `AAPR05`). No
 birthplace component is used. Eight-character codes are rejected.
-Missing or invalid codes cannot start the tutorial. There is no test-code
-fallback. The post-survey link sends `pid`, `journey`, `lang`, and
+An explicitly supplied invalid or empty `pid` cannot start the tutorial. There
+is no test-code fallback. The post-survey link sends `pid`, `journey`, `lang`, and
 `appletcomplete=1`. It does not force a fresh LimeSurvey session with `newtest=Y`.
+
+Opening the normal applet URL without a `pid` parameter starts standalone use.
+These visitors can complete the full tutorial with the Poincare sphere
+(Polarization 1), then keep exploring. They see neither study-participation
+instructions nor a post-test link, and no participant code is generated.
+Refresh recovery also works in standalone use. Its checkpoint identity is
+separate from study codes, so switching between standalone use and a study link
+does not transfer progress. A valid `pid` continues to select the normal study
+condition and enables the post-survey button on completion.
 
 The study is English-only. Incoming links with another `lang` value, including
 older German links, use English messages and are normalized to `lang=en` when
