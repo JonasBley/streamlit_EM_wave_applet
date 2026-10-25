@@ -57,9 +57,12 @@ html, body { margin: 0; padding: 0; overflow: hidden; }
     const chart = document.getElementById("chart");
     const errorBox = document.getElementById("error");
     const clone = value => JSON.parse(JSON.stringify(value));
+    const STACK_BREAKPOINT = 800;
     let revision = null;
     let roles = {};
     let cameras = {};
+    let lastArgs = null;
+    let lastStacked = null;
     let initialized = false;
     let rendering = false;
     let pending = null;
@@ -67,6 +70,10 @@ html, body { margin: 0; padding: 0; overflow: hidden; }
 
     function send(type, payload = {}) {
         window.parent.postMessage({isStreamlitMessage: true, type, ...payload}, "*");
+    }
+
+    function isStacked(sceneCount) {
+        return sceneCount > 1 && chart.clientWidth > 0 && chart.clientWidth < STACK_BREAKPOINT;
     }
 
     function rememberCamera(event) {
@@ -87,6 +94,7 @@ html, body { margin: 0; padding: 0; overflow: hidden; }
     }
 
     async function render(args) {
+        lastArgs = args;
         const figure = JSON.parse(args.figure_json);
         // Streamlit sends its resolved theme separately from component args.
         // This includes the OS preference when the app follows system settings.
@@ -101,11 +109,19 @@ html, body { margin: 0; padding: 0; overflow: hidden; }
         document.body.style.color = foreground;
         document.documentElement.style.colorScheme = dark ? "dark" : "light";
         errorBox.style.color = dark ? "#ff9b9b" : "#b00020";
+        roles = args.scene_roles;
+        const roleOrder = {incident: 0, spatial: 1, transmitted: 2};
+        const sceneEntries = Object.entries(roles).sort(
+            (a, b) => (roleOrder[a[1]] ?? 99) - (roleOrder[b[1]] ?? 99)
+        );
+        const stacked = isStacked(sceneEntries.length);
         if (revision !== args.revision) {
             revision = args.revision;
             cameras = {}; // Deliberately reset on a new tutorial step.
+        } else if (lastStacked !== null && lastStacked !== stacked) {
+            delete cameras.spatial;
         }
-        roles = args.scene_roles;
+        lastStacked = stacked;
         const layout = figure.layout || {};
         layout.paper_bgcolor = background;
         layout.plot_bgcolor = background;
@@ -125,11 +141,34 @@ html, body { margin: 0; padding: 0; overflow: hidden; }
         for (const annotation of layout.annotations || []) {
             annotation.font = {...annotation.font, color: foreground};
         }
+        let effectiveHeight = args.height;
+        if (stacked) {
+            // Top-to-bottom order on narrow screens: first Poincare sphere,
+            // then spatial graph, then second Poincare sphere (when present).
+            const yDomains = sceneEntries.length === 3
+                ? [[0.71, 1.0], [0.345, 0.655], [0.0, 0.29]]
+                : [[0.55, 1.0], [0.0, 0.475]];
+            effectiveHeight = sceneEntries.length === 3 ? 1180 : 800;
+            layout.margin = {...layout.margin, t: 55, b: 80};
+            layout.legend = {...layout.legend, y: -0.02};
+            sceneEntries.forEach(([scene], index) => {
+                layout[scene] ||= {};
+                layout[scene].domain = {x: [0, 1], y: yDomains[index]};
+                const annotation = layout.annotations?.[index];
+                if (annotation) {
+                    annotation.x = 0.5;
+                    annotation.xanchor = "center";
+                    annotation.y = yDomains[index][1];
+                    annotation.yanchor = "bottom";
+                    annotation.yshift = 4;
+                }
+            });
+        }
         layout.autosize = true;
         delete layout.width;
-        layout.height = args.height;
+        layout.height = effectiveHeight;
         layout.uirevision = revision;
-        for (const [scene, role] of Object.entries(roles)) {
+        for (const [scene, role] of sceneEntries) {
             layout[scene] ||= {};
             layout[scene].bgcolor = background;
             for (const name of ["xaxis", "yaxis", "zaxis"]) {
@@ -147,21 +186,23 @@ html, body { margin: 0; padding: 0; overflow: hidden; }
             else if (layout[scene].camera) {
                 // Fit the initial wave view to its available width. Only do
                 // this on a new step/reset, preserving subsequent user views.
-                if (role === "spatial" && Object.keys(roles).length > 1) {
-                    const domain = layout[scene].domain.x;
+                if (role === "spatial" && sceneEntries.length > 1) {
+                    const domainX = layout[scene].domain.x;
+                    const domainY = layout[scene].domain.y;
                     const plotWidth = Math.max(1, chart.clientWidth - layout.margin.l - layout.margin.r);
-                    const sceneWidth = Math.max(1, plotWidth * (domain[1] - domain[0]));
-                    const plotHeight = args.height - layout.margin.t - layout.margin.b;
+                    const sceneWidth = Math.max(1, plotWidth * (domainX[1] - domainX[0]));
+                    const plotHeight = effectiveHeight - layout.margin.t - layout.margin.b;
+                    const sceneHeight = Math.max(1, plotHeight * (domainY[1] - domainY[0]));
                     const aspect = layout[scene].aspectratio.x;
-                    const scale = Math.max(0.65, plotHeight / sceneWidth * (aspect >= 4 ? 1.4 : 1.15));
+                    const scale = Math.max(0.65, sceneHeight / sceneWidth * (aspect >= 4 ? 1.4 : 1.15));
                     const eye = layout[scene].camera.eye;
                     for (const axis of ["x", "y", "z"]) eye[axis] *= scale;
                 }
                 cameras[role] = clone(layout[scene].camera);
             }
         }
-        chart.style.height = args.height + "px";
-        send("streamlit:setFrameHeight", {height: args.height});
+        chart.style.height = effectiveHeight + "px";
+        send("streamlit:setFrameHeight", {height: effectiveHeight});
         rendering = true;
         try {
             await Plotly.react(chart, figure.data, layout, {...args.config, responsive: true});
@@ -201,7 +242,13 @@ html, body { margin: 0; padding: 0; overflow: hidden; }
     new ResizeObserver(() => {
         cancelAnimationFrame(resizeFrame);
         resizeFrame = requestAnimationFrame(() => {
-            if (initialized && !rendering) Plotly.Plots.resize(chart);
+            if (!initialized || rendering) return;
+            if (lastArgs && isStacked(Object.keys(roles).length) !== lastStacked) {
+                pending = lastArgs;
+                void drain();
+            } else {
+                Plotly.Plots.resize(chart);
+            }
         });
     }).observe(document.body);
     send("streamlit:componentReady", {apiVersion: 1});

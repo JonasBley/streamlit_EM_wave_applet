@@ -18,6 +18,7 @@ SOURCE = (ROOT / 'app.py').read_text(encoding='utf-8') + '''
 st.session_state['_test_derived'] = derived_state
 st.session_state['_test_met'] = target_met
 st.session_state['_test_figure'] = fig.to_dict()
+st.session_state['_test_scene_roles'] = scene_roles
 st.session_state['_test_wave_samples'] = [list(trace.x) for trace in fig.data[:3]]
 '''
 
@@ -167,6 +168,26 @@ class FeedbackTests(unittest.TestCase):
                     if isinstance(value,str):
                         for match in re.finditer(r'\$\$(.*?)\$\$|\$(.*?)\$', value, re.S):
                             convert(match.group(1) or match.group(2))
+
+    def test_mobile_vertical_stack_order(self):
+        app = self.app('Polarization 1')
+        for key, value in step_setup('Polarization 1', 8).items():
+            app.session_state[key] = value
+        app.session_state.current_step = 8
+        app.run()
+        self.clean(app)
+        self.assertEqual(
+            list(app.session_state['_test_scene_roles'].items()),
+            [('scene', 'incident'), ('scene2', 'spatial'), ('scene3', 'transmitted')],
+        )
+        annotations = app.session_state['_test_figure']['layout']['annotations']
+        self.assertEqual(len(annotations), 3)
+        self.assertIn('Incident State', annotations[0]['text'])
+        self.assertEqual(annotations[1]['text'], 'Spatial Propagation')
+        self.assertIn('Transmitted State', annotations[2]['text'])
+        app_source = (ROOT / 'app.py').read_text(encoding='utf-8')
+        self.assertIn('roleOrder = {incident: 0, spatial: 1, transmitted: 2}', app_source)
+        self.assertIn('[[0.71, 1.0], [0.345, 0.655], [0.0, 0.29]]', app_source)
 
 
 if __name__ == '__main__':
