@@ -170,7 +170,7 @@ class StudySessionTests(unittest.TestCase):
             self.assertFalse(fresh.checkbox(key='show_ex').value)
             self.assertEqual(fresh.session_state.show_poincare, journey == 'Polarization 1')
             url = fresh.get('link_button')[0].proto.url
-            self.assertEqual(urlparse(url).path, '/index.php/385657')
+            self.assertEqual(urlparse(url).path, '/index.php/778238')
             self.assertEqual(parse_qs(urlparse(url).query), {
                 'pid': [code], 'journey': [journey], 'lang': ['en'], 'appletcomplete': ['1'],
             })

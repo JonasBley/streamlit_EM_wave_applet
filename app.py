@@ -12,7 +12,7 @@ from latex2mathml.converter import convert as latex_to_mathml
 
 # Update these IDs after importing new survey copies. Keep query parameters
 # out of the base URLs: language and study parameters are appended below.
-POST_SURVEY_URL = "https://umfrage.uni-leipzig.de/index.php/385657"
+POST_SURVEY_URL = "https://umfrage.uni-leipzig.de/index.php/778238"
 PRE_SURVEY_URL = "https://umfrage.uni-leipzig.de/index.php/861912"
 # Isolates standalone refresh checkpoints; never sent as a participant code.
 STANDALONE_RESUME_KEY = "standalone"
@@ -25,6 +25,34 @@ st.markdown("""
 [data-testid="stMainBlockContainer"] {
     padding-left: clamp(0.75rem, 1.5vw, 1.5rem);
     padding-right: clamp(0.75rem, 1.5vw, 1.5rem);
+}
+/* Wrap 4-column parameter blocks into a 2x2 grid on tablet/medium screens
+   so nested slider + number input pairs have enough room for 3 decimals. */
+@media (min-width: 641px) and (max-width: 1050px) {
+    [data-testid="stMainBlockContainer"] [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(4):last-child) {
+        flex-wrap: wrap;
+    }
+    [data-testid="stMainBlockContainer"] [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(4):last-child) > [data-testid="stColumn"] {
+        flex: 1 1 calc(50% - 1rem) !important;
+        min-width: calc(50% - 1rem) !important;
+    }
+}
+/* Keep slider + number input side-by-side and readable on mobile screens. */
+@media (max-width: 640px) {
+    [data-testid="stColumn"] [data-testid="stHorizontalBlock"] {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    [data-testid="stColumn"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child {
+        flex: 1 1 65% !important;
+        min-width: 0 !important;
+    }
+    [data-testid="stColumn"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child {
+        flex: 0 0 5.5rem !important;
+        min-width: 5.5rem !important;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -46,8 +74,8 @@ def _camera_component_directory():
     (directory / "index.html").write_text(r'''<!doctype html>
 <html><head><meta charset="utf-8">
 <style>
-html, body { margin: 0; padding: 0; overflow: hidden; }
-#chart { width: 100%; }
+html, body { margin: 0; padding: 0; overflow: hidden; touch-action: pan-y; }
+#chart, #chart .svg-container, #chart .main-svg { width: 100%; touch-action: pan-y; }
 #error { color: #b00020; font: 14px sans-serif; white-space: pre-wrap; }
 </style>
 <script src="plotly.min.js"></script>
@@ -153,7 +181,9 @@ html, body { margin: 0; padding: 0; overflow: hidden; }
             layout.legend = {...layout.legend, y: -0.02};
             sceneEntries.forEach(([scene], index) => {
                 layout[scene] ||= {};
-                layout[scene].domain = {x: [0, 1], y: yDomains[index]};
+                // Inset horizontal domain slightly on stacked mobile layouts so
+                // swiping near the screen edges scrolls the page comfortably.
+                layout[scene].domain = {x: [0.06, 0.94], y: yDomains[index]};
                 const annotation = layout.annotations?.[index];
                 if (annotation) {
                     annotation.x = 0.5;

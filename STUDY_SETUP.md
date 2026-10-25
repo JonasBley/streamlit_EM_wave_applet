@@ -4,7 +4,7 @@
 
 The `pid` URL field carries the hand-generated study code. It is retained for
 compatibility with the supplied LimeSurvey structures (pre: 861912; post:
-385657); it is not a LimeSurvey response ID. The app trims surrounding whitespace
+778238); it is not a LimeSurvey response ID. The app trims surrounding whitespace
 and uppercases the code, matching the pre-survey's `strtoupper(PIDINPUT.NAOK)`.
 
 Accepted codes contain exactly four letters plus a day from 01 to 31, for

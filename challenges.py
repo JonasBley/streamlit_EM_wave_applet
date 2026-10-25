@@ -115,7 +115,10 @@ SHARED_STEPS = [{'text': '<b>Step 1 of 9: The Macroscopic Wave</b><br><b>Polariz
                  'fast axis is aligned horizontally ($\\Delta = 0^\\circ$). Setting the retardance to $\\Gamma = 1.5\\pi$ delays '
                  'the vertical component of the wave by $\\frac{3\\pi}{2}$ (which is geometrically equivalent to '
                  '$-\\frac{\\pi}{2}$). This transforms the in-phase diagonal oscillation into a left-handed spiral, creating '
-                 'left-circularly polarized light.',
+                 'left-circularly polarized light. Note that a quarter-wave plate ($\\Gamma = \\frac{\\pi}{2}$ or $\\frac{3\\pi}{2}$) '
+                 'only converts linearly polarized light into circular polarization when the incident linear polarization is at '
+                 '$45^\\circ$ to the fast and slow axes; if the incident light is aligned with the fast or slow axis, only one '
+                 'component is present and the output remains linearly polarized.',
   'example': '<b>Example: a half-wave plate with a horizontal fast axis.</b> For diagonal input, '
              '$$\\begin{pmatrix}1&0\\\\0&-1\\end{pmatrix}\\frac{1}{\\sqrt{2}}\\begin{pmatrix}1\\\\1\\end{pmatrix}=\\frac{1}{\\sqrt{2}}\\begin{pmatrix}1\\\\-1\\end{pmatrix}.$$ '
              'The horizontal component is unchanged and the vertical component gains a phase of $\\pi$, giving anti-diagonal '
@@ -164,7 +167,10 @@ SHARED_STEPS = [{'text': '<b>Step 1 of 9: The Macroscopic Wave</b><br><b>Polariz
   'explanation': 'We begin at horizontal polarization and want to map to diagonal polarization. A half-wave plate ($\\Gamma = '
                  '1.0\\pi$) reflects the incident polarization angle about its fast axis. For horizontal input the output angle is $2\\Delta$. To rotate '
                  'from $0^\\circ$ (horizontal) to $45^\\circ$ (diagonal), a possible solution uses exactly half the total '
-                 'rotation as the fast axis angle: $$\\Delta = \\frac{45^\\circ}{2} = 22.5^\\circ$$'},
+                 'rotation as the fast axis angle: $$\\Delta = \\frac{45^\\circ}{2} = 22.5^\\circ$$ Because a half-wave plate '
+                 'acts as a reflection across its fast axis (mapping an input angle $\\alpha$ to $2\\Delta - \\alpha$) rather '
+                 'than adding a fixed angle to every input, the rotation depends on the incident state: for example, light '
+                 'polarized along the fast axis ($\\alpha = \\Delta$) is transmitted with its polarization angle unchanged.'},
  {'text': '<b>Step 7 of 9: Linear Polarizers</b><br>Unlike a wave plate, a linear polarizer is a <i>non-unitary</i> operator—it '
           'absorbs light and reduces overall intensity (defined as the absolute value of the Jones vector squared). A horizontal '
           'polarizer projects the electric field onto the $x$-axis, represented by the matrix:<br><br>$\\mathbf{P}(0^\\circ) = '
