@@ -1,3 +1,8 @@
+import sys
+for _pkg, _attr in (("pyarrow", "Table"), ("pandas", "Series")):
+    if _pkg in sys.modules and not hasattr(sys.modules[_pkg], _attr):
+        for _mod in [k for k in list(sys.modules) if k == _pkg or k.startswith(_pkg + ".")]:
+            sys.modules.pop(_mod, None)
 import streamlit as st
 import streamlit.components.v1 as components
 import numpy as np
@@ -6,7 +11,7 @@ from plotly.subplots import make_subplots
 import re
 import uuid
 from urllib.parse import urlencode
-from challenges import CHALLENGES, CONDITIONS, step_setup, GLOSSARY, SPHERE_GLOSSARY
+from challenges import CHALLENGES, CONDITIONS, step_setup, GLOSSARY, SPHERE_GLOSSARY, glossary_for_step
 from study_session import normalize_study_code, condition_for_code, encode_resume, decode_resume, input_format
 from latex2mathml.converter import convert as latex_to_mathml
 
@@ -63,14 +68,14 @@ scroll_slot = st.empty()
 # Keep Plotly's graph and camera state in that iframe, rather than recreating
 # a native st.plotly_chart whose ID includes the changing figure JSON.
 @st.cache_resource
-def _camera_component_directory():
+def _camera_component_directory(version="2026-10-26-unified-fonts"):
     from pathlib import Path
     import tempfile
     from plotly.offline import get_plotlyjs
 
     directory = Path(tempfile.mkdtemp(prefix="polarization_plotly_"))
     # Serve the JS bundled with the installed Plotly; no CDN is required.
-    (directory / "plotly.min.js").write_text(get_plotlyjs(), encoding="utf-8")
+    (directory / "plotly.min.js").write_text(get_plotlyjs().replace("if(h&&h!==1)", "if(false)"), encoding="utf-8")
     (directory / "index.html").write_text(r'''<!doctype html>
 <html><head><meta charset="utf-8">
 <style>
@@ -156,7 +161,7 @@ html, body { margin: 0; padding: 0; overflow: hidden; touch-action: pan-y; }
         layout.font = {...layout.font, color: foreground};
         if (theme.font) layout.font.family = theme.font;
         for (const trace of figure.data || []) {
-            if (trace.meta?.role === "jones_reference_labels") {
+            if (trace.meta?.role === "jones_reference_labels" || trace.meta?.role === "themed_3d_label") {
                 trace.textfont = {...trace.textfont, color: foreground};
             }
         }
@@ -170,6 +175,9 @@ html, body { margin: 0; padding: 0; overflow: hidden; touch-action: pan-y; }
             annotation.font = {...annotation.font, color: foreground};
         }
         let effectiveHeight = args.height;
+        if (!stacked && chart.clientWidth > 1400) {
+            effectiveHeight = Math.round(args.height * Math.min(1.35, chart.clientWidth / 1400));
+        }
         if (stacked) {
             // Top-to-bottom order on narrow screens: first Poincare sphere,
             // then spatial graph, then second Poincare sphere (when present).
@@ -224,7 +232,7 @@ html, body { margin: 0; padding: 0; overflow: hidden; touch-action: pan-y; }
                     const plotHeight = effectiveHeight - layout.margin.t - layout.margin.b;
                     const sceneHeight = Math.max(1, plotHeight * (domainY[1] - domainY[0]));
                     const aspect = layout[scene].aspectratio.x;
-                    const scale = Math.max(0.65, sceneHeight / sceneWidth * (aspect >= 4 ? 1.4 : 1.15));
+                    const scale = Math.max(0.58, sceneHeight / sceneWidth * (aspect >= 4 ? 1.32 : 1.08));
                     const eye = layout[scene].camera.eye;
                     for (const axis of ["x", "y", "z"]) eye[axis] *= scale;
                 }
@@ -471,7 +479,9 @@ retardance = st.session_state.retardance_pi * np.pi if st.session_state.insert_w
 
 pol_angle = np.deg2rad(st.session_state.pol_angle_deg) if st.session_state.insert_pol else 0.0
 
-z_start, z_wp_in, z_wp_out = 0, 10, 15
+z_start, z_wp_in = 0, 10
+wp_thickness = (0.4 + 3.8 * st.session_state.retardance_pi) if st.session_state.insert_wp else 5.0
+z_wp_out = z_wp_in + wp_thickness
 z_pol = 25
 z_end = 35 if st.session_state.insert_pol else 25
 resolution = 600
@@ -597,7 +607,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.title("Polarization of Light")
-st.caption(f"Active Module: {st.session_state.assigned_journey}")
+
 
 challenge_data = CHALLENGES[st.session_state.current_challenge]["steps"]
 step_data = challenge_data[st.session_state.current_step]
@@ -693,7 +703,7 @@ col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
 
 with col1:
     st.subheader(r"Incident Wave")
-    st.write(r"$\vec{E} = \begin{pmatrix} E_x \\ E_y e^{i\varphi} \end{pmatrix}$")
+    st.write(r"$\mathbf{E} = \begin{pmatrix} E_x \\ E_y e^{i\varphi} \end{pmatrix}$")
     create_synced_input(r"Amplitude $E_x$", 0.0, 1.0, 0.001, "E_x_amp")
     st.write(fr"$E_y=$ {np.sqrt(1.0 - st.session_state.E_x_amp ** 2):.3f}")
     create_synced_input(r"Relative Phase $\varphi$ ($\times\pi$ rad)", 0.0, 2.0, 0.125, "phase_relative_pi")
@@ -731,15 +741,18 @@ with col4:
         if sphere_allowed:
             st.checkbox("Show Poincaré Sphere(s)", key="show_poincare", on_change=save_browser_progress)
 
+extinction_slot = st.empty()
 if intensity_percent <= 1e-10:
-    st.info("No light is transmitted; an output polarization state is undefined.")
+    extinction_slot.info("No light is transmitted; an output polarization state is undefined.")
+caption_slot = st.empty()
 if st.session_state.show_poincare and st.session_state.insert_pol:
-    st.caption("Schematic correction: the dotted connection joins the before/after states. It is not a physical trajectory or a projection through the sphere.")
+    caption_slot.caption("Schematic correction: the dotted connection joins the before/after states. It is not a physical trajectory or a projection through the sphere.")
 
 # --- 5. VISUALIZATION ---
 # Independent sizes: keep the Jones references at their original size.
 JONES_LABEL_SIZE = 18
 WP_LABEL_SIZE = 24
+SPHERE_LABEL_SIZE = 18
 
 spatial_title = f"Spatial Propagation"
 has_two_spheres = st.session_state.insert_wp or st.session_state.insert_pol
@@ -750,14 +763,14 @@ if st.session_state.show_poincare:
         transmitted_title = "Transmitted State<br>(with Polarizer Operator)" if st.session_state.insert_pol else "Transmitted State"
         fig = make_subplots(
             rows=1, cols=3, specs=[[{"type": "scene"}, {"type": "scene"}, {"type": "scene"}]],
-            column_widths=[0.22, 0.56, 0.22], horizontal_spacing=0.012,
+            column_widths=[0.24, 0.52, 0.24], horizontal_spacing=0.012,
             subplot_titles=(incident_title, spatial_title, transmitted_title),
         )
         sphere1_col, spatial_col, sphere2_col = 1, 2, 3
     else:
         fig = make_subplots(
             rows=1, cols=2, specs=[[{"type": "scene"}, {"type": "scene"}]],
-            column_widths=[0.28, 0.72], horizontal_spacing=0.012,
+            column_widths=[0.30, 0.70], horizontal_spacing=0.012,
             subplot_titles=("Polarization State", spatial_title),
         )
         sphere1_col, spatial_col = 1, 2
@@ -885,7 +898,7 @@ if st.session_state.insert_pol:
     fig.add_trace(
         go.Scatter3d(x=arc_x, y=arc_y, z=arc_z, mode='lines', line=dict(color='cyan', width=2), hoverinfo='skip',
                      showlegend=False), row=1, col=spatial_col)
-    fig.add_trace(go.Scatter3d(x=txt_x, y=txt_y, z=txt_z, mode='text', text=txt_v, textfont=dict(color='cyan', size=15),
+    fig.add_trace(go.Scatter3d(x=txt_x, y=txt_y, z=txt_z, mode='text', text=txt_v, textposition='middle center', textfont=dict(color='cyan', size=WP_LABEL_SIZE),
                                hoverinfo='skip', showlegend=False), row=1, col=spatial_col)
 
 # Combined Projection
@@ -1000,7 +1013,7 @@ if st.session_state.show_poincare:
                 go.Scatter3d(x=a_x, y=a_y, z=a_z, mode='lines', line=dict(color='orange', width=3), hoverinfo='skip',
                              showlegend=False), row=1, col=sphere1_col)
             fig.add_trace(
-                go.Scatter3d(x=t_x, y=t_y, z=t_z, mode='text', text=t_v, textposition='middle center', textfont=dict(color='orange', size=WP_LABEL_SIZE),
+                go.Scatter3d(x=t_x, y=t_y, z=t_z, mode='text', text=t_v, textposition='middle center', textfont=dict(color='orange', size=SPHERE_LABEL_SIZE),
                              hoverinfo='skip', showlegend=False), row=1, col=sphere1_col)
 
             # Retardance Arc Poincare
@@ -1030,7 +1043,7 @@ if st.session_state.show_poincare:
                         showscale=False, sizemode="absolute", sizeref=0.1, anchor="tail", hoverinfo='skip',
                         showlegend=False), row=1, col=sphere1_col)
             fig.add_trace(go.Scatter3d(x=t_x, y=t_y, z=t_z, mode='text', text=t_v, textposition='top center',
-                                       textfont=dict(color='darkorange', size=WP_LABEL_SIZE), hoverinfo='skip', showlegend=False),
+                                       textfont=dict(color='darkorange', size=SPHERE_LABEL_SIZE), hoverinfo='skip', showlegend=False),
                           row=1, col=sphere1_col)
 
         if st.session_state.insert_pol:
@@ -1043,7 +1056,7 @@ if st.session_state.show_poincare:
             )
             fig.add_trace(go.Scatter3d(x=[S_pol_axis[0]], y=[S_pol_axis[1]], z=[S_pol_axis[2]], mode='text',
                                        visible=intensity_percent > 1e-10, text=[f"Pol ({intensity_percent:.2f}%)<br>"], textposition='top center',
-                                       textfont=dict(size=15), hoverinfo='skip', showlegend=False), row=1,
+                                       textfont=dict(size=SPHERE_LABEL_SIZE), meta=dict(role='themed_3d_label'), hoverinfo='skip', showlegend=False), row=1,
                           col=sphere2_col)
             fig.add_trace(
                 go.Scatter3d(x=[S_out[0], S_pol_axis[0]], y=[S_out[1], S_pol_axis[1]], z=[S_out[2], S_pol_axis[2]],
@@ -1061,7 +1074,7 @@ if st.session_state.show_poincare:
             fig.add_trace(
                 go.Scatter3d(x=a_x, y=a_y, z=a_z, mode='lines', line=dict(color='cyan', width=3), hoverinfo='skip',
                              showlegend=False), row=1, col=sphere2_col)
-            fig.add_trace(go.Scatter3d(x=t_x, y=t_y, z=t_z, mode='text', text=t_v, textfont=dict(color='cyan', size=15),
+            fig.add_trace(go.Scatter3d(x=t_x, y=t_y, z=t_z, mode='text', text=t_v, textposition='middle center', textfont=dict(color='cyan', size=SPHERE_LABEL_SIZE),
                                        hoverinfo='skip', showlegend=False), row=1, col=sphere2_col)
 
     else:
@@ -1094,10 +1107,10 @@ scene_poincare_config = dict(
 # Stable default cameras; the component restores user cameras within each step.
 
 scene_spatial_config["camera"] = dict(
-    eye=dict(x=1.2, y=-3.8, z=1.2)
+    eye=dict(x=1.08, y=-3.4, z=1.08)
 )
 scene_poincare_config["camera"] = dict(
-    eye=dict(x=1.9, y=1.9, z=1.9)
+    eye=dict(x=1.68, y=1.68, z=1.68)
 )
 
 for annotation in fig['layout']['annotations']:
@@ -1204,7 +1217,7 @@ if is_last_step and st.session_state.current_challenge != "Free Play":
         st.markdown("You can continue exploring the applet or close this page whenever you are finished.")
 
 with st.expander("📖 Glossary"):
-    st.markdown(GLOSSARY)
+    st.markdown(glossary_for_step(st.session_state.current_step, step_solved=target_met))
     if sphere_allowed and st.session_state.current_step >= 2:
         st.markdown(SPHERE_GLOSSARY)
 

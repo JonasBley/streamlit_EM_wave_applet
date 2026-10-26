@@ -13,7 +13,7 @@ CONDITIONS = {
 SHARED_STEPS = [{'text': '<b>Step 1 of 9: The Macroscopic Wave</b><br><b>Polarization</b> describes the pattern traced by the electric-field '
           'direction over time at a fixed position.<br>Classical light is an electromagnetic wave where the electric field '
           '$\\vec{E}$ is confined to the transverse $x$-$y$ plane, oscillating perpendicular to the direction of propagation. '
-          'Polarized light can be described by the so-called Jones vector $\\vec{E} = \\begin{pmatrix} E_x \\\\ E_y '
+          'Polarized light can be described by the so-called Jones vector $\\mathbf{E} = \\begin{pmatrix} E_x \\\\ E_y '
           'e^{i\\varphi} \\end{pmatrix}$. This vector describes the electromagnetic wave with its maximum amplitudes in $x$ and '
           '$y$-direction, $E_x$ and $E_y$, and a relative phase between the components of the electromagnetic wave. Here we '
           'normalize the incident intensity to one: $|E_x|^2+|E_y|^2=1$. A Jones vector need not be normalized: after a '
@@ -21,7 +21,8 @@ SHARED_STEPS = [{'text': '<b>Step 1 of 9: The Macroscopic Wave</b><br><b>Polariz
   'task': 'You are starting with a completely vertically polarized state $\\mathbf{J}_{V}= \\begin{pmatrix} 0 \\\\ 1 '
           '\\end{pmatrix}$. Move the slider to $E_x=0.5$ and watch the change in the electric field components and the combined '
           'wave in the applet below. Move it around for a closer look. Notice how the amplitude in $y$ direction $E_y$ is not '
-          'the same as $E_x$.',
+          'the same as $E_x$. You can also use the box next to the slider to manually write the number you want. Scroll down '
+          'the page to see whether your solution is correct (a blue explanation box will appear) and use a hint if not.',
   'hint': 'Focus on the <b>Incident Wave</b> section. Adjust the first slider until the Amplitude $E_x$ reads exactly '
           '<b>0.50</b>.',
   'setup': {'insert_wp': False,
@@ -38,9 +39,9 @@ SHARED_STEPS = [{'text': '<b>Step 1 of 9: The Macroscopic Wave</b><br><b>Polariz
                  '\\sqrt{1.0 - 0.5^2} = \\sqrt{0.75} \\approx 0.866$$ Since no relative phase shift is present ($\\varphi = 0$), '
                  'the wave remains linearly polarized, but the unequal component amplitudes tilt the net polarization angle away '
                  'from the standard $45^\\circ$ line. Click on the Next Step button below the applet to proceed.'},
- {'text': '<b>Step 2 of 9: Constructing Standard States</b><br>Any state of polarization $\\mathbf{J}$ can be expressed as a '
+ {'text': '<b>Step 2 of 9: Constructing Standard States</b><br>Any state of polarization $\\mathbf{E}$ can be expressed as a '
           'linear combination of horizontal $\\mathbf{J}_H=\\begin{pmatrix}1 \\\\ 0\\end{pmatrix}$ and vertical '
-          '$\\mathbf{J}_V=\\begin{pmatrix}0 \\\\ 1\\end{pmatrix}$ basis vectors: $$\\mathbf{J}=\\alpha \\mathbf{J}_H+ '
+          '$\\mathbf{J}_V=\\begin{pmatrix}0 \\\\ 1\\end{pmatrix}$ basis vectors: $$\\mathbf{E}=\\alpha \\mathbf{J}_H+ '
           '\\beta\\mathbf{J}_V,$$ where $\\alpha$ and $\\beta$ are complex numbers. For our unit-intensity incident wave we '
           'choose $|\\alpha|^2+|\\beta|^2=1$. This normalization describes polarization separately from intensity; a transmitted '
           'Jones vector can have a smaller squared norm.',
@@ -48,7 +49,8 @@ SHARED_STEPS = [{'text': '<b>Step 1 of 9: The Macroscopic Wave</b><br><b>Polariz
           '\\frac{1}{\\sqrt{2}} \\left(\\mathbf{J}_H+\\mathbf{J}_V\\right)= \\frac{1}{\\sqrt{2}} \\begin{pmatrix} 1 \\\\ 1 '
           '\\end{pmatrix}$.',
   'hint': 'You want the amplitudes to be perfectly balanced. Start with $|E_x|^2+|E_y|^2=1$, and require that $|E_x|=|E_y|$. '
-          'What are $|E_x|$ and $|E_y|$ in that case?',
+          'What are $|E_x|$ and $|E_y|$ in that case? Find that, due to the normalization condition, $E_y$ below the slider '
+          'changes when you change $E_x$.',
   'setup': {'show_toggles': False, 'disable_keys': ['phase_relative_pi']},
   'target': {'E_x_amp': BALANCED_AMPLITUDE, 'phase_relative_pi': [0.0, 2.0]},
   'solution': {'E_x_amp': BALANCED_AMPLITUDE, 'phase_relative_pi': 0.0},
@@ -58,9 +60,9 @@ SHARED_STEPS = [{'text': '<b>Step 1 of 9: The Macroscopic Wave</b><br><b>Polariz
                  '$\\varphi = 0$ (or $2\\pi$) keeps the components in geometric phase synchronization, forcing the electric '
                  'field vector to sweep out a linear path at exactly $+45^\\circ$ in the transverse plane.'},
  {'text': '<b>Step 3 of 9: Circular States</b><br>Notice how the diagonal state you just created features perfectly balanced '
-          'amplitudes and no phase shift $\\varphi=0$.<br><br><b>Circular convention:</b> We use '
-          '$\\vec{E}(z,t)=\\mathrm{Re}[\\mathbf{J}e^{i(kz-\\omega t)}]$. We call $(1,+i)/\\sqrt{2}$ right-circular and '
-          '$(1,-i)/\\sqrt{2}$ left-circular. At $z=0$, the right-circular field turns from $+x$ toward $+y$ as time increases: '
+          'amplitudes and no phase shift $\\varphi=0$.<br><br><b>Circular convention:</b> We call '
+          '$\\frac{1}{\\sqrt{2}}\\begin{pmatrix} 1 \\\\ i \\end{pmatrix}$ right-circular and '
+          '$\\frac{1}{\\sqrt{2}}\\begin{pmatrix} 1 \\\\ -i \\end{pmatrix}$ left-circular. At $z=0$, the right-circular field turns from $+x$ toward $+y$ as time increases: '
           'counterclockwise when looking toward the source (against $+z$, with $x$ right and $y$ up). Looking along propagation '
           'reverses that apparent sense. The plotted helix is a spatial snapshot at one time, not a time animation.',
   'task': 'Starting with a diagonally polarized state, introduce a relative phase shift to create a <b>Right-Circular</b> state. '
@@ -108,7 +110,7 @@ SHARED_STEPS = [{'text': '<b>Step 1 of 9: The Macroscopic Wave</b><br><b>Polariz
   'target': {'E_x_amp': BALANCED_AMPLITUDE, 'retardance_pi': 1.5},
   'solution': {'retardance_pi': 1.5},
   'explanation': 'The incident wave is diagonally polarized: $\\mathbf{J}_{in} = \\frac{1}{\\sqrt{2}}\\begin{pmatrix} 1 \\\\ 1 '
-                 '\\end{pmatrix}$. The wave plate operator is: $$\\mathbf{M}(0^\\circ, 3\\pi/2) =  \\begin{pmatrix} 1 & 0 \\\\ 0 '
+                 '\\end{pmatrix}$. The wave plate operator is: $$\\mathbf{M}(\\Delta, \\Gamma) = \\mathbf{M}(0^\\circ, 3\\pi/2) =  \\begin{pmatrix} 1 & 0 \\\\ 0 '
                  '& e^{3i\\pi/2}=-i \\end{pmatrix}$$ Multiplying this operator by the incident wave yields: $$\\begin{pmatrix} 1 '
                  '& 0 \\\\ 0 & -i \\end{pmatrix}\\cdot \\frac{1}{\\sqrt{2}} \\begin{pmatrix} 1 \\\\ 1 \\end{pmatrix} = '
                  "\\frac{1}{\\sqrt{2}}\\begin{pmatrix} 1 \\\\ -i \\end{pmatrix} = \\mathbf{J}_L.$$ Physically, the wave plate's "
@@ -265,7 +267,7 @@ SHARED_STEPS = [{'text': '<b>Step 1 of 9: The Macroscopic Wave</b><br><b>Polariz
   'setup': {'insert_wp': True, 'insert_pol': True, 'show_toggles': True, 'show_poincare': False, 'disable_keys': []},
   'target': {}}]
 
-SPHERE_GUIDANCE = {2: {'text': 'We have now revealed the <b>Poincaré sphere</b>. The diagonal state maps to the equator. Linear states lie on the '
+SPHERE_GUIDANCE = {2: {'text': 'We have now revealed the <b>Poincaré sphere</b>. The polarization state is shown as a green vector on the Poincaré sphere (and once optical elements are added, the outgoing state is shown as a green vector on the Poincaré sphere to the right). The diagonal state maps to the equator. Linear states lie on the '
              'equator; their relative phase is $0$ or $\\pi$ when both components are nonzero.',
      'task': 'On the sphere, the target is the north pole.',
      'explanation': 'The state moves from the equator to the north pole through $\\pi/2$. The reference positions are '
@@ -274,11 +276,11 @@ SPHERE_GUIDANCE = {2: {'text': 'We have now revealed the <b>Poincaré sphere</b>
                     'Equal-amplitude states lie in the vertical plane spanned by the diagonal and right-circular axes.',
      'hint': 'A right-circular state requires equal amplitudes (which you already have) but a $\\pi/2$ phase shift.'},
  3: {'text': 'The Poincaré sphere now shows the WP operator as a rotation axis (orange dashed line). On the Poincaré sphere, the '
-             'retardance is the angle of rotation around the axis of the wave plate operator.',
+             'retardance is the angle of rotation around the axis of the wave plate operator. The outgoing state is shown as a green vector on the Poincaré sphere to the right.',
      'explanation': 'Geometrically on the Poincaré sphere, the wave plate fast axis at $\\Delta = 0^\\circ$ creates a rotation '
                     'axis pointing towards the horizontal state. Setting the retardance to $\\Gamma = 1.5\\pi$ rotates the '
                     'diagonal vector around this axis by 270$^\\circ$, leaving the vector at the bottom of the sphere.',
-     'hint': 'Look at the orange dashed rotation axis on the sphere. How far do you need to rotate the vector for it to reach '
+     'hint': 'Look at the orange dashed rotation axis on the sphere. The rotation angle is shown in the left sphere as the circular arrow around the rotation axis of the wave plate. How far do you need to rotate the vector for it to reach '
              'the bottom pole?'},
  4: {'text': 'The retardance $\\Gamma$ is the rotation angle on the sphere, and the fast axis angle $\\Delta$ sets the azimuthal '
              'angle $2\\Delta$ of the WP operator axis on the equator.',
@@ -380,3 +382,39 @@ SPHERE_GLOSSARY = r"""
 
 **Operator axis:** the axis about which a wave plate rotates the state on the sphere; its equatorial angle is twice the physical fast-axis angle.
 """
+
+
+def glossary_for_step(step_index, step_solved=False):
+    """Return GLOSSARY with a one-line list of standard Jones vectors introduced up to step_index."""
+    if step_index <= 0:
+        vectors_line = (
+            r"**Standard Jones vectors:** "
+            r"$\mathbf{J}_V = \begin{pmatrix} 0 \\ 1 \end{pmatrix}$"
+        )
+    elif step_index == 1:
+        vectors_line = (
+            r"**Standard Jones vectors:** "
+            r"$\mathbf{J}_H = \begin{pmatrix} 1 \\ 0 \end{pmatrix}$, "
+            r"$\mathbf{J}_V = \begin{pmatrix} 0 \\ 1 \end{pmatrix}$, "
+            r"$\mathbf{J}_D = \frac{1}{\sqrt{2}}\begin{pmatrix} 1 \\ 1 \end{pmatrix}$"
+        )
+    elif step_index == 2 and not step_solved:
+        vectors_line = (
+            r"**Standard Jones vectors:** "
+            r"$\mathbf{J}_H = \begin{pmatrix} 1 \\ 0 \end{pmatrix}$, "
+            r"$\mathbf{J}_V = \begin{pmatrix} 0 \\ 1 \end{pmatrix}$, "
+            r"$\mathbf{J}_D = \frac{1}{\sqrt{2}}\begin{pmatrix} 1 \\ 1 \end{pmatrix}$, "
+            r"$\mathbf{J}_R = \frac{1}{\sqrt{2}}\begin{pmatrix} 1 \\ i \end{pmatrix}$, "
+            r"$\mathbf{J}_L = \frac{1}{\sqrt{2}}\begin{pmatrix} 1 \\ -i \end{pmatrix}$"
+        )
+    else:
+        vectors_line = (
+            r"**Standard Jones vectors:** "
+            r"$\mathbf{J}_H = \begin{pmatrix} 1 \\ 0 \end{pmatrix}$, "
+            r"$\mathbf{J}_V = \begin{pmatrix} 0 \\ 1 \end{pmatrix}$, "
+            r"$\mathbf{J}_D = \frac{1}{\sqrt{2}}\begin{pmatrix} 1 \\ 1 \end{pmatrix}$, "
+            r"$\mathbf{J}_A = \frac{1}{\sqrt{2}}\begin{pmatrix} 1 \\ -1 \end{pmatrix}$, "
+            r"$\mathbf{J}_R = \frac{1}{\sqrt{2}}\begin{pmatrix} 1 \\ i \end{pmatrix}$, "
+            r"$\mathbf{J}_L = \frac{1}{\sqrt{2}}\begin{pmatrix} 1 \\ -i \end{pmatrix}$"
+        )
+    return GLOSSARY.strip() + "\n\n" + vectors_line + "\n"
