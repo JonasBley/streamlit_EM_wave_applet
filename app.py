@@ -417,9 +417,15 @@ if st.session_state.show_landing:
 # --- 1. TUTORIAL NAVIGATION ---
 
 
+def _invalidate_synced_tracking():
+    for _bkey in ("E_x_amp", "phase_relative_pi", "wp_angle_deg", "retardance_pi", "pol_angle_deg"):
+        st.session_state.pop(f"{_bkey}_last_base", None)
+
+
 def load_step_setup(challenge_name, step_index, solved=False):
     st.session_state.update(step_setup(challenge_name, step_index, solved))
     st.session_state.solution_origin = "review" if solved else None
+    _invalidate_synced_tracking()
 
 
 
@@ -463,6 +469,7 @@ def solve_challenge():
 
     for k, v in step_data.get("solution", {}).items():
         st.session_state[k] = v
+    _invalidate_synced_tracking()
     st.session_state.solution_origin = "shown"
     save_browser_progress()
 
@@ -492,26 +499,17 @@ for _bkey, _min_v, _max_v, _step_v in _SYNCED_SPECS:
     if _bkey not in st.session_state:
         continue
     _skey, _nkey, _lkey = f"{_bkey}_slider", f"{_bkey}_num", f"{_bkey}_last_base"
+    st.session_state[f"{_bkey}_cb_done"] = None
     _bval = float(st.session_state[_bkey])
     if _lkey not in st.session_state or abs(float(st.session_state[_lkey]) - _bval) > 1e-9:
         _cval = _clamp_step(_bval, _min_v, _max_v, _step_v)
         st.session_state[_skey] = _cval
         st.session_state[_nkey] = _cval
         st.session_state[_lkey] = _bval
-    else:
-        _cbval = _clamp_step(_bval, _min_v, _max_v, _step_v)
-        _nval = _clamp_step(st.session_state[_nkey], _min_v, _max_v, _step_v) if _nkey in st.session_state else _cbval
-        _sval = _clamp_step(st.session_state[_skey], _min_v, _max_v, _step_v) if _skey in st.session_state else _cbval
-        if abs(_nval - _cbval) > 1e-9:
-            st.session_state[_bkey] = _nval
-            st.session_state[_skey] = _nval
-            st.session_state[_nkey] = _nval
-            st.session_state[_lkey] = _nval
-        elif abs(_sval - _cbval) > 1e-9:
-            st.session_state[_bkey] = _sval
-            st.session_state[_skey] = _sval
-            st.session_state[_nkey] = _sval
-            st.session_state[_lkey] = _sval
+        st.session_state[f"{_bkey}_b_slider"] = _cval
+        st.session_state[f"{_bkey}_b_num"] = _cval
+        st.session_state[f"{_bkey}_pending_s"] = set()
+        st.session_state[f"{_bkey}_pending_n"] = set()
 
 E_x_amp = min(1.0, max(0.0, float(st.session_state.E_x_amp)))
 E_y_amp = np.sqrt(max(0.0, 1.0 - E_x_amp ** 2))
@@ -719,26 +717,70 @@ def create_synced_input(label, min_val, max_val, step_val, base_key):
     number_format = input_format(step_val)
 
     last_key = f"{base_key}_last_base"
+    b_slider_key = f"{base_key}_b_slider"
+    b_num_key = f"{base_key}_b_num"
+    pending_s_key = f"{base_key}_pending_s"
+    pending_n_key = f"{base_key}_pending_n"
+    done_key = f"{base_key}_cb_done"
+    st.session_state[done_key] = None
     target_val = _clamp_step(st.session_state[base_key], min_val, max_val, step_val)
     if (slider_key not in st.session_state) or abs(float(st.session_state[slider_key]) - target_val) > 1e-9:
         st.session_state[slider_key] = target_val
     if (num_key not in st.session_state) or abs(float(st.session_state[num_key]) - target_val) > 1e-9:
         st.session_state[num_key] = target_val
+    if b_slider_key not in st.session_state:
+        st.session_state[b_slider_key] = target_val
+    if b_num_key not in st.session_state:
+        st.session_state[b_num_key] = target_val
 
     def sync_from_slider():
-        val = _clamp_step(st.session_state[slider_key], min_val, max_val, step_val)
-        st.session_state[base_key] = val
-        st.session_state[last_key] = val
-        st.session_state[slider_key] = val
-        st.session_state[num_key] = val
+        raw_s = _clamp_step(st.session_state[slider_key], min_val, max_val, step_val)
+        raw_n = (
+            _clamp_step(st.session_state[num_key], min_val, max_val, step_val)
+            if num_key in st.session_state
+            else raw_s
+        )
+        if st.session_state.get(done_key) == (raw_s, raw_n):
+            return
+        prev_bn = st.session_state.get(b_num_key, raw_n)
+        pending_n = st.session_state.get(pending_n_key, set())
+        if abs(raw_n - prev_bn) > 1e-9 and raw_n not in pending_n:
+            st.session_state[b_slider_key] = raw_s
+            return
+        st.session_state[b_slider_key] = raw_s
+        st.session_state[b_num_key] = raw_n
+        pend_n = set(pending_n)
+        pend_n.update((raw_n, raw_s))
+        st.session_state[pending_n_key] = pend_n
+        st.session_state[pending_s_key] = set()
+        st.session_state[base_key] = raw_s
+        st.session_state[last_key] = raw_s
+        st.session_state[done_key] = (raw_s, raw_n)
 
 
     def sync_from_num():
-        val = _clamp_step(st.session_state[num_key], min_val, max_val, step_val)
-        st.session_state[base_key] = val
-        st.session_state[last_key] = val
-        st.session_state[num_key] = val
-        st.session_state[slider_key] = val
+        raw_n = _clamp_step(st.session_state[num_key], min_val, max_val, step_val)
+        raw_s = (
+            _clamp_step(st.session_state[slider_key], min_val, max_val, step_val)
+            if slider_key in st.session_state
+            else raw_n
+        )
+        if st.session_state.get(done_key) == (raw_s, raw_n):
+            return
+        prev_bs = st.session_state.get(b_slider_key, raw_s)
+        pending_s = st.session_state.get(pending_s_key, set())
+        if abs(raw_s - prev_bs) > 1e-9 and raw_s not in pending_s:
+            st.session_state[b_num_key] = raw_n
+            return
+        st.session_state[b_num_key] = raw_n
+        st.session_state[b_slider_key] = raw_s
+        pend_s = set(pending_s)
+        pend_s.update((raw_s, raw_n))
+        st.session_state[pending_s_key] = pend_s
+        st.session_state[pending_n_key] = set()
+        st.session_state[base_key] = raw_n
+        st.session_state[last_key] = raw_n
+        st.session_state[done_key] = (raw_s, raw_n)
 
 
     st.markdown(label)

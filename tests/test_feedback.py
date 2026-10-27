@@ -189,6 +189,44 @@ class FeedbackTests(unittest.TestCase):
         self.assertIn('roleOrder = {incident: 0, spatial: 1, transmitted: 2}', app_source)
         self.assertIn('[[0.71, 1.0], [0.345, 0.655], [0.0, 0.29]]', app_source)
 
+    def test_rapid_number_and_slider_sync(self):
+        app = self.app('Polarization 1')
+        app.number_input(key='E_x_amp_num').set_value(0.705).run()
+        self.clean(app)
+        self.assertAlmostEqual(app.session_state['E_x_amp'], 0.705)
+
+        # Click 1: 0.705 -> 0.706
+        app.number_input(key='E_x_amp_num').set_value(0.706).run()
+        self.clean(app)
+        self.assertAlmostEqual(app.session_state['E_x_amp'], 0.706)
+
+        # Click 2: 0.706 -> 0.707 while browser still reports stale slider=0.705
+        app.slider(key='E_x_amp_slider').set_value(0.705)
+        app.number_input(key='E_x_amp_num').set_value(0.707).run()
+        self.clean(app)
+        self.assertAlmostEqual(app.session_state['E_x_amp'], 0.707)
+        self.assertAlmostEqual(app.number_input(key='E_x_amp_num').value, 0.707)
+        self.assertAlmostEqual(app.slider(key='E_x_amp_slider').value, 0.707)
+
+        # Click 3: 0.707 -> 0.708 while browser slider catches up only to 0.706
+        app.slider(key='E_x_amp_slider').set_value(0.706)
+        app.number_input(key='E_x_amp_num').set_value(0.708).run()
+        self.clean(app)
+        self.assertAlmostEqual(app.session_state['E_x_amp'], 0.708)
+        self.assertAlmostEqual(app.number_input(key='E_x_amp_num').value, 0.708)
+        self.assertAlmostEqual(app.slider(key='E_x_amp_slider').value, 0.708)
+
+        # Then user drags slider back to 0.706 and 0.705 while number_input lags at 0.708
+        app.slider(key='E_x_amp_slider').set_value(0.706).run()
+        self.clean(app)
+        self.assertAlmostEqual(app.session_state['E_x_amp'], 0.706)
+        app.slider(key='E_x_amp_slider').set_value(0.705)
+        app.number_input(key='E_x_amp_num').set_value(0.708).run()
+        self.clean(app)
+        self.assertAlmostEqual(app.session_state['E_x_amp'], 0.705)
+        self.assertAlmostEqual(app.number_input(key='E_x_amp_num').value, 0.705)
+        self.assertAlmostEqual(app.slider(key='E_x_amp_slider').value, 0.705)
+
 
 if __name__ == '__main__':
     unittest.main()
