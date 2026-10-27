@@ -33,7 +33,7 @@ st.markdown("""
 }
 /* Wrap 4-column parameter blocks into a 2x2 grid on tablet/medium screens
    so nested slider + number input pairs have enough room for 3 decimals. */
-@media (min-width: 641px) and (max-width: 1050px) {
+@media (min-width: 641px) and (max-width: 1350px) {
     [data-testid="stMainBlockContainer"] [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"]:nth-child(4):last-child) {
         flex-wrap: wrap;
     }
@@ -43,6 +43,7 @@ st.markdown("""
     }
 }
 /* Keep slider + number input side-by-side and readable on mobile screens. */
+[data-testid="stColumn"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child { min-width: 8.25rem !important; }
 @media (max-width: 640px) {
     [data-testid="stColumn"] [data-testid="stHorizontalBlock"] {
         flex-direction: row !important;
@@ -55,8 +56,8 @@ st.markdown("""
         min-width: 0 !important;
     }
     [data-testid="stColumn"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child {
-        flex: 0 0 5.5rem !important;
-        min-width: 5.5rem !important;
+        flex: 0 0 8.25rem !important;
+        min-width: 8.25rem !important;
     }
 }
 </style>
@@ -406,7 +407,7 @@ if st.session_state.show_landing:
     with col2:
         if st.button("🚀 I understand, start the tutorial!", use_container_width=True):
             st.session_state.show_landing = False
-            save_browser_progress()
+    
             st.rerun()
 
     # Stop the rest of the script from running while the landing page is active
@@ -435,11 +436,13 @@ def back_step():
         st.session_state.show_hint = False
         st.session_state.scroll_to_top = True
         load_step_setup(st.session_state.current_challenge, st.session_state.current_step, solved=True)
-        save_browser_progress()
+
 
 
 def next_step():
-    st.session_state.current_step += 1
+    max_step = len(CHALLENGES[st.session_state.current_challenge]["steps"]) - 1
+    if st.session_state.current_step < max_step:
+        st.session_state.current_step += 1
     st.session_state.show_hint = False
     st.session_state.scroll_to_top = True
     load_step_setup(st.session_state.current_challenge, st.session_state.current_step)
@@ -470,8 +473,48 @@ if not sphere_allowed:
     st.session_state.show_poincare = False
 
 # --- 2. PHYSICS EXTRACTION & SIMULATION ---
-E_x_amp = st.session_state.E_x_amp
-E_y_amp = np.sqrt(1.0 - E_x_amp ** 2)
+_SYNCED_SPECS = (
+    ("E_x_amp", 0.0, 1.0, 0.001),
+    ("phase_relative_pi", 0.0, 2.0, 0.125),
+    ("wp_angle_deg", 0.0, 180.0, 0.5),
+    ("retardance_pi", 0.0, 2.0, 0.125),
+    ("pol_angle_deg", 0.0, 180.0, 1.0),
+)
+
+
+def _clamp_step(value, min_val, max_val, step_val):
+    decimals = len(str(step_val).rstrip("0").partition(".")[2])
+    clamped = min(float(max_val), max(float(min_val), float(value)))
+    return round(clamped, decimals)
+
+
+for _bkey, _min_v, _max_v, _step_v in _SYNCED_SPECS:
+    if _bkey not in st.session_state:
+        continue
+    _skey, _nkey, _lkey = f"{_bkey}_slider", f"{_bkey}_num", f"{_bkey}_last_base"
+    _bval = float(st.session_state[_bkey])
+    if _lkey not in st.session_state or abs(float(st.session_state[_lkey]) - _bval) > 1e-9:
+        _cval = _clamp_step(_bval, _min_v, _max_v, _step_v)
+        st.session_state[_skey] = _cval
+        st.session_state[_nkey] = _cval
+        st.session_state[_lkey] = _bval
+    else:
+        _cbval = _clamp_step(_bval, _min_v, _max_v, _step_v)
+        _nval = _clamp_step(st.session_state[_nkey], _min_v, _max_v, _step_v) if _nkey in st.session_state else _cbval
+        _sval = _clamp_step(st.session_state[_skey], _min_v, _max_v, _step_v) if _skey in st.session_state else _cbval
+        if abs(_nval - _cbval) > 1e-9:
+            st.session_state[_bkey] = _nval
+            st.session_state[_skey] = _nval
+            st.session_state[_nkey] = _nval
+            st.session_state[_lkey] = _nval
+        elif abs(_sval - _cbval) > 1e-9:
+            st.session_state[_bkey] = _sval
+            st.session_state[_skey] = _sval
+            st.session_state[_nkey] = _sval
+            st.session_state[_lkey] = _sval
+
+E_x_amp = min(1.0, max(0.0, float(st.session_state.E_x_amp)))
+E_y_amp = np.sqrt(max(0.0, 1.0 - E_x_amp ** 2))
 phase_relative = st.session_state.phase_relative_pi * np.pi
 
 wp_angle = np.deg2rad(st.session_state.wp_angle_deg) if st.session_state.insert_wp else 0.0
@@ -610,6 +653,7 @@ st.title("Polarization of Light")
 
 
 challenge_data = CHALLENGES[st.session_state.current_challenge]["steps"]
+st.session_state.current_step = max(0, min(st.session_state.current_step, len(challenge_data) - 1))
 step_data = challenge_data[st.session_state.current_step]
 is_last_step = st.session_state.current_step >= len(challenge_data) - 1
 if is_last_step and not study_code:
@@ -674,23 +718,31 @@ def create_synced_input(label, min_val, max_val, step_val, base_key):
     is_disabled = base_key in st.session_state.get("disable_keys", [])
     number_format = input_format(step_val)
 
-    if (slider_key not in st.session_state) or (st.session_state[slider_key] != st.session_state[base_key]):
-        st.session_state[slider_key] = float(st.session_state[base_key])
-    if (num_key not in st.session_state) or (st.session_state[num_key] != st.session_state[base_key]):
-        st.session_state[num_key] = float(st.session_state[base_key])
+    last_key = f"{base_key}_last_base"
+    target_val = _clamp_step(st.session_state[base_key], min_val, max_val, step_val)
+    if (slider_key not in st.session_state) or abs(float(st.session_state[slider_key]) - target_val) > 1e-9:
+        st.session_state[slider_key] = target_val
+    if (num_key not in st.session_state) or abs(float(st.session_state[num_key]) - target_val) > 1e-9:
+        st.session_state[num_key] = target_val
 
     def sync_from_slider():
-        st.session_state[base_key] = st.session_state[slider_key]
-        st.session_state[num_key] = st.session_state[slider_key]
-        save_browser_progress()
+        val = _clamp_step(st.session_state[slider_key], min_val, max_val, step_val)
+        st.session_state[base_key] = val
+        st.session_state[last_key] = val
+        st.session_state[slider_key] = val
+        st.session_state[num_key] = val
+
 
     def sync_from_num():
-        st.session_state[base_key] = st.session_state[num_key]
-        st.session_state[slider_key] = st.session_state[num_key]
-        save_browser_progress()
+        val = _clamp_step(st.session_state[num_key], min_val, max_val, step_val)
+        st.session_state[base_key] = val
+        st.session_state[last_key] = val
+        st.session_state[num_key] = val
+        st.session_state[slider_key] = val
+
 
     st.markdown(label)
-    c1, c2 = st.columns([2.5, 1])
+    c1, c2 = st.columns([1.5, 1])
     with c1:
         st.slider(label, min_value=float(min_val), max_value=float(max_val), step=float(step_val), key=slider_key,
                   on_change=sync_from_slider, label_visibility="collapsed", disabled=is_disabled, format=number_format)
@@ -705,7 +757,7 @@ with col1:
     st.subheader(r"Incident Wave")
     st.write(r"$\mathbf{E} = \begin{pmatrix} E_x \\ E_y e^{i\varphi} \end{pmatrix}$")
     create_synced_input(r"Amplitude $E_x$", 0.0, 1.0, 0.001, "E_x_amp")
-    st.write(fr"$E_y=$ {np.sqrt(1.0 - st.session_state.E_x_amp ** 2):.3f}")
+    st.write(fr"$E_y=$ {E_y_amp:.3f}")
     create_synced_input(r"Relative Phase $\varphi$ ($\times\pi$ rad)", 0.0, 2.0, 0.125, "phase_relative_pi")
 
 with col2:
